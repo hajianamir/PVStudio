@@ -1,6 +1,7 @@
 """
 WeatherProvider Interface, Dataset Metadata & Cross-Validation Constants
-Per Phase 1 Technical Specification §3.2, Sprint 2 & Sprint 3 Audit 3
+Per Phase 1 Technical Specification §3.2, Sprint 2, Sprint 3 & Sprint 4 Kickoff Item 3
+Includes policy_applied and divergence_flagged fields in DatasetMetadata.
 """
 
 from abc import ABC, abstractmethod
@@ -21,7 +22,8 @@ class DatasetMetadata(BaseModel):
     spatial_resolution: str = Field(..., description="Spatial grid resolution (e.g. 4 km grid)")
     is_user_override: bool = Field(default=False, description="True if dataset was manually selected by user")
     source_url: str = Field(..., description="Source API or documentation URL")
-    weather_source_policy: str = Field(default=WEATHER_SOURCE_POLICY, description="Policy governing primary/secondary weather source selection")
+    policy_applied: str = Field(default=WEATHER_SOURCE_POLICY, description="Policy governing primary/secondary weather source selection")
+    divergence_flagged: bool = Field(default=False, description="True if cross-validation tolerance threshold was exceeded")
 
 
 class IrradianceSeries(BaseModel):
@@ -42,7 +44,8 @@ class CrossValidationResult(BaseModel):
     temp_divergence_deg_c: float
     ghi_tolerance_threshold_percent: float = CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT
     temp_tolerance_threshold_deg_c: float = CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C
-    weather_source_policy: str = WEATHER_SOURCE_POLICY
+    policy_applied: str = WEATHER_SOURCE_POLICY
+    divergence_flagged: bool = False
     status: str = Field(..., description="MATCH if within thresholds, MANUAL_REVIEW_REQUIRED if exceeded")
 
 
@@ -73,7 +76,8 @@ class PVGISProvider(WeatherProvider):
             spatial_resolution="approx 4 km grid",
             is_user_override=False,
             source_url="https://joint-research-centre.ec.europa.eu/pvgis-photovoltaic-geographical-information-system_en",
-            weather_source_policy=WEATHER_SOURCE_POLICY
+            policy_applied=WEATHER_SOURCE_POLICY,
+            divergence_flagged=False
         )
 
     def get_irradiance(self, lat: float, lon: float, year: int = 2020) -> IrradianceSeries:
@@ -99,7 +103,8 @@ class NASAPowerProvider(WeatherProvider):
             spatial_resolution="0.5 x 0.625 deg grid",
             is_user_override=False,
             source_url="https://power.larc.nasa.gov/",
-            weather_source_policy=WEATHER_SOURCE_POLICY
+            policy_applied=WEATHER_SOURCE_POLICY,
+            divergence_flagged=False
         )
 
     def get_irradiance(self, lat: float, lon: float, year: int = 2020) -> IrradianceSeries:
@@ -132,15 +137,20 @@ def cross_validate_weather(lat: float, lon: float) -> CrossValidationResult:
     is_ghi_ok = ghi_div_percent <= CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT
     is_temp_ok = temp_div_deg_c <= CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C
 
-    status_str = "MATCH" if (is_ghi_ok and is_temp_ok) else "MANUAL_REVIEW_REQUIRED"
+    is_flagged = not (is_ghi_ok and is_temp_ok)
+    status_str = "MATCH" if not is_flagged else "MANUAL_REVIEW_REQUIRED"
+
+    primary_meta = pvgis.get_metadata()
+    primary_meta.divergence_flagged = is_flagged
 
     return CrossValidationResult(
-        primary_provider=pvgis.get_metadata(),
+        primary_provider=primary_meta,
         secondary_provider=nasa.get_metadata(),
         ghi_divergence_percent=round(ghi_div_percent, 2),
         temp_divergence_deg_c=round(temp_div_deg_c, 2),
         ghi_tolerance_threshold_percent=CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT,
         temp_tolerance_threshold_deg_c=CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C,
-        weather_source_policy=WEATHER_SOURCE_POLICY,
+        policy_applied=WEATHER_SOURCE_POLICY,
+        divergence_flagged=is_flagged,
         status=status_str
     )
