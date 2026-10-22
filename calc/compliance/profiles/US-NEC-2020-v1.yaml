@@ -1,0 +1,29 @@
+# US NEC 2020 Residential Compliance Profile
+profile_id: "US-NEC-2020-v1"
+market: "United States"
+jurisdiction: "US-NEC"
+version: "1.0.0"
+effective_date: "2020-01-01"
+
+dc_system:
+  max_voltage_residential_v: 600
+  dc_ampacity_factor: 1.25
+  rapid_shutdown_required: true
+
+ac_interconnection:
+  busbar_120_percent_rule_enabled: true
+  feeder_125_percent_rule_enabled: true
+
+tariff_defaults:
+  currency_symbol: "$"
+  retail_rate_usd_kwh: 0.22
+  feed_in_tariff_usd_kwh: 0.08
+  tax_credit_percent: 30.0  # US Inflation Reduction Act (IRA) 30% Solar ITC
+  net_metering_type: "FULL_NET_METERING"
+
+standards_citations:
+  fuse_standard: "UL 2579 (per NEC 690.9)"
+  breaker_standard: "UL 489 / NEC 240"
+  spd_standard: "UL 1449 Type 1 or Type 2"
+  grounding_standard: "NEC 2020 Article 250"
+  lightning_standard: "NFPA 780 / UL 96A"

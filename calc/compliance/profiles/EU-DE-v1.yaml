@@ -1,0 +1,29 @@
+# Germany / EU Residential Compliance Profile
+profile_id: "EU-DE-v1"
+market: "Germany / European Union"
+jurisdiction: "EU-DE"
+version: "1.0.0"
+effective_date: "2020-01-01"
+
+dc_system:
+  max_voltage_residential_v: 1000
+  dc_ampacity_factor: 1.25
+  rapid_shutdown_required: false
+
+ac_interconnection:
+  busbar_120_percent_rule_enabled: false
+  feeder_125_percent_rule_enabled: false
+
+tariff_defaults:
+  currency_symbol: "€"
+  retail_rate_usd_kwh: 0.35
+  feed_in_tariff_usd_kwh: 0.082  # EEG Feed-in Tariff
+  tax_credit_percent: 0.0        # 0% VAT exemption (MwSt-Befreiung 2023)
+  net_metering_type: "SURPLUS_FEED_IN"
+
+standards_citations:
+  fuse_standard: "IEC 60269-6 (gPV)"
+  breaker_standard: "IEC 60364-4-43"
+  spd_standard: "IEC 61643-11 Class II"
+  grounding_standard: "IEC 60364-5-54"
+  lightning_standard: "IEC 62305-2 / 62305-3"
