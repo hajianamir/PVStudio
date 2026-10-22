@@ -3,9 +3,9 @@ Compliance Layer & Refusal-to-Guess Safeguard Checker
 Per Technical Specification §6.4 & Gate Criterion G4
 Supports strict refusal on incomplete profiles and audited override paths with user identity & reason.
 
-Phase 1 Single-Role Scaffolding Limitation:
-  Currently permits single PE user override if valid reason (min 10 chars) provided.
-  Multi-role requirement (Designer Proposes -> PE Approves) will be enforced at Gate G4.
+Governance Schedule Note:
+  Phase 1 Scaffolding State: Single PE user override permitted with min 10-char reason.
+  Phase 2 Sprint 2 Milestone: 2-stage approval workflow (Designer Proposes -> PE Confirms) scheduled for Sprint 2.
 """
 
 from datetime import datetime, timezone
@@ -58,7 +58,8 @@ def evaluate_design_compliance(
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "override_reason": override_reason.strip(),
                 "missing_rules": missing_rules,
-                "client_visible_watermark": OVERRIDE_WATERMARK_HEADER
+                "client_visible_watermark": OVERRIDE_WATERMARK_HEADER,
+                "remediation_target": "Phase 2 Sprint 2 2-Stage Approval Workflow"
             }
             return ComplianceCheckResult(
                 is_approved=True,
