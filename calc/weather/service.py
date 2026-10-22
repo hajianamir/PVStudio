@@ -1,6 +1,6 @@
 """
 WeatherProvider Interface, Dataset Metadata & Cross-Validation Constants
-Per Phase 1 Technical Specification §3.2 & Action Item 5
+Per Phase 1 Technical Specification §3.2, Sprint 2 & Sprint 3 Audit 3
 """
 
 from abc import ABC, abstractmethod
@@ -11,6 +11,9 @@ from pydantic import BaseModel, Field
 CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT: float = 5.0
 CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C: float = 3.0
 
+# Explicit Weather Source Conflict Policy
+WEATHER_SOURCE_POLICY = "PRIMARY_PROVIDER_WIN_WITH_DIVERGENCE_FLAG"
+
 
 class DatasetMetadata(BaseModel):
     provider_name: str = Field(..., description="Name of weather data provider (e.g. PVGIS, NASA_POWER)")
@@ -18,6 +21,7 @@ class DatasetMetadata(BaseModel):
     spatial_resolution: str = Field(..., description="Spatial grid resolution (e.g. 4 km grid)")
     is_user_override: bool = Field(default=False, description="True if dataset was manually selected by user")
     source_url: str = Field(..., description="Source API or documentation URL")
+    weather_source_policy: str = Field(default=WEATHER_SOURCE_POLICY, description="Policy governing primary/secondary weather source selection")
 
 
 class IrradianceSeries(BaseModel):
@@ -38,6 +42,7 @@ class CrossValidationResult(BaseModel):
     temp_divergence_deg_c: float
     ghi_tolerance_threshold_percent: float = CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT
     temp_tolerance_threshold_deg_c: float = CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C
+    weather_source_policy: str = WEATHER_SOURCE_POLICY
     status: str = Field(..., description="MATCH if within thresholds, MANUAL_REVIEW_REQUIRED if exceeded")
 
 
@@ -45,7 +50,7 @@ class WeatherProvider(ABC):
 
     @abstractmethod
     def get_metadata(self) -> DatasetMetadata:
-        """Returns dataset metadata stamp with all 4 required fields."""
+        """Returns dataset metadata stamp with all required fields."""
         pass
 
     @abstractmethod
@@ -67,7 +72,8 @@ class PVGISProvider(WeatherProvider):
             vintage_year_range="2005-2020",
             spatial_resolution="approx 4 km grid",
             is_user_override=False,
-            source_url="https://joint-research-centre.ec.europa.eu/pvgis-photovoltaic-geographical-information-system_en"
+            source_url="https://joint-research-centre.ec.europa.eu/pvgis-photovoltaic-geographical-information-system_en",
+            weather_source_policy=WEATHER_SOURCE_POLICY
         )
 
     def get_irradiance(self, lat: float, lon: float, year: int = 2020) -> IrradianceSeries:
@@ -92,7 +98,8 @@ class NASAPowerProvider(WeatherProvider):
             vintage_year_range="1981-2022",
             spatial_resolution="0.5 x 0.625 deg grid",
             is_user_override=False,
-            source_url="https://power.larc.nasa.gov/"
+            source_url="https://power.larc.nasa.gov/",
+            weather_source_policy=WEATHER_SOURCE_POLICY
         )
 
     def get_irradiance(self, lat: float, lon: float, year: int = 2020) -> IrradianceSeries:
@@ -134,5 +141,6 @@ def cross_validate_weather(lat: float, lon: float) -> CrossValidationResult:
         temp_divergence_deg_c=round(temp_div_deg_c, 2),
         ghi_tolerance_threshold_percent=CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT,
         temp_tolerance_threshold_deg_c=CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C,
+        weather_source_policy=WEATHER_SOURCE_POLICY,
         status=status_str
     )

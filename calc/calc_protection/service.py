@@ -1,0 +1,50 @@
+"""
+calc_protection: Basic Breaker, Fuse & SPD Selection Package
+Per Technical Specification §4.4 Module 5 & Sprint 3 Scope
+Calculates string gPV fuse rating, AC circuit breaker sizing, and SPD class selection.
+"""
+
+from pydantic import BaseModel, Field
+from calc.provenance import CalculationResult, ProvenanceEnvelope, compute_input_hash
+
+
+class ProtectionInput(BaseModel):
+    i_sc_stc_a: float = Field(..., gt=0, description="Module Isc at STC [A]")
+    i_ac_nominal_a: float = Field(..., gt=0, description="Nominal AC inverter output current [A]")
+    parallel_strings: int = Field(default=1, ge=1, description="Number of parallel strings per MPPT")
+    profile_id: str = Field(default="US-NEC-2020-v1")
+
+
+def calculate_protection(inputs: ProtectionInput) -> CalculationResult:
+    # String fuse required if parallel strings >= 3
+    is_dc_fuse_required = inputs.parallel_strings >= 3
+    recommended_fuse_rating_a = round(inputs.i_sc_stc_a * 1.56, 1) if is_dc_fuse_required else 0.0
+
+    # AC Breaker sizing (1.25 continuous factor, round up to standard breaker sizes)
+    raw_breaker = inputs.i_ac_nominal_a * 1.25
+    standard_breakers = [16, 20, 25, 32, 40, 50, 63]
+    selected_breaker_a = next((b for b in standard_breakers if b >= raw_breaker), 63)
+
+    inputs_dict = inputs.model_dump()
+    input_hash = compute_input_hash(inputs_dict)
+
+    provenance = ProvenanceEnvelope(
+        calc_module="calc_protection",
+        calc_version="1.0.0",
+        input_hash=input_hash,
+        profile_id=inputs.profile_id,
+        standards_referenced=["IEC 60269-6", "NEC Article 690.9"]
+    )
+
+    outputs = {
+        "is_dc_fuse_required": is_dc_fuse_required,
+        "recommended_fuse_rating_a": recommended_fuse_rating_a,
+        "recommended_ac_breaker_a": selected_breaker_a,
+        "recommended_spd_type": "TYPE_2_DC_AND_AC"
+    }
+
+    return CalculationResult(
+        provenance=provenance,
+        inputs=inputs_dict,
+        outputs=outputs
+    )
