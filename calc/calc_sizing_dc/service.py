@@ -1,7 +1,8 @@
 """
 calc_sizing_dc: Module-Inverter String Sizing Calculation Package
-Finalized per Sprint 3 Scope & Technical Specification §4.4 Module 2
-Returns full intermediate temperature-adjusted voltages, currents, and min/max module limits.
+Finalized per Technical Specification §4.4 Module 2 & Sprint 3 Scope
+Includes NOCT-based cell temperature model under irradiance:
+  T_cell = T_ambient + ((NOCT - 20) / 800) * G
 """
 
 import math
@@ -15,6 +16,8 @@ class DCSizingInput(BaseModel):
     v_mp_stc: float = Field(..., gt=0, description="Module Vmp at STC [V]")
     i_sc_stc: float = Field(default=13.5, gt=0, description="Module Isc at STC [A]")
     i_mp_stc: float = Field(default=12.8, gt=0, description="Module Imp at STC [A]")
+    noct_c: float = Field(default=45.0, gt=20, le=60, description="Nominal Operating Cell Temperature [°C]")
+    irradiance_cold_wm2: float = Field(default=1000.0, ge=0, le=1400, description="Design cold irradiance level [W/m2]")
     temp_coeff_voc_percent: float = Field(..., lt=0, description="Voc temperature coefficient [%/°C]")
     temp_coeff_pmp_percent: float = Field(..., lt=0, description="Pmp temperature coefficient [%/°C]")
     site_temp_min_c: float = Field(..., ge=-60, le=50, description="Record minimum ambient temp [°C]")
@@ -28,22 +31,23 @@ class DCSizingInput(BaseModel):
 
 def calculate_dc_sizing(inputs: DCSizingInput) -> CalculationResult:
     """
-    Finalized String Sizing Calculator.
-    Computes temperature-adjusted Voc_max_cold, Vmp_min_hot, Isc_max_hot, and returns
-    full intermediate transparency values required by UI transparency panel.
+    Finalized String Sizing Calculator using NOCT cell temperature modeling per IEC 62548.
+    T_cell_cold = site_temp_min_c + ((noct_c - 20) / 800) * irradiance_cold_wm2
     """
-    # 1. Cold Temperature Window (Max Voc)
-    delta_t_min = inputs.site_temp_min_c - 25.0
-    v_oc_mod_max_cold = inputs.v_oc_stc * (1.0 + (inputs.temp_coeff_voc_percent / 100.0) * delta_t_min)
+    # 1. Cold Temperature Window (NOCT-based cell temp under irradiance)
+    t_cell_cold_c = inputs.site_temp_min_c + ((inputs.noct_c - 20.0) / 800.0) * inputs.irradiance_cold_wm2
+    delta_t_cold = t_cell_cold_c - 25.0
+    v_oc_mod_max_cold = inputs.v_oc_stc * (1.0 + (inputs.temp_coeff_voc_percent / 100.0) * delta_t_cold)
     max_modules_per_string = int(inputs.inverter_v_max_dc // v_oc_mod_max_cold)
 
     # 2. Hot Temperature Window (Min Vmp & Max Isc)
-    delta_t_max = inputs.site_temp_max_c - 25.0
-    v_mp_mod_min_hot = inputs.v_mp_stc * (1.0 + (inputs.temp_coeff_pmp_percent / 100.0) * delta_t_max)
+    t_cell_hot_c = inputs.site_temp_max_c + ((inputs.noct_c - 20.0) / 800.0) * 1000.0
+    delta_t_hot = t_cell_hot_c - 25.0
+    v_mp_mod_min_hot = inputs.v_mp_stc * (1.0 + (inputs.temp_coeff_pmp_percent / 100.0) * delta_t_hot)
     min_modules_per_string = math.ceil(inputs.inverter_v_mppt_min / v_mp_mod_min_hot)
 
     # Hot temperature Isc correction (+0.05%/°C typical)
-    i_sc_mod_max_hot = inputs.i_sc_stc * (1.0 + 0.0005 * delta_t_max)
+    i_sc_mod_max_hot = inputs.i_sc_stc * (1.0 + 0.0005 * delta_t_hot)
 
     # Actual String Voltages
     v_oc_string_max_site = max_modules_per_string * v_oc_mod_max_cold
@@ -63,7 +67,7 @@ def calculate_dc_sizing(inputs: DCSizingInput) -> CalculationResult:
         calc_version="1.0.0",
         input_hash=input_hash,
         profile_id=inputs.profile_id,
-        standards_referenced=["NEC 2020 Article 690.7", "IEC 62548 Section 7.2"]
+        standards_referenced=["NEC 2020 Article 690.7", "IEC 62548 Section 7.2", "IEC 61215 NOCT Model"]
     )
 
     outputs = {
@@ -76,13 +80,15 @@ def calculate_dc_sizing(inputs: DCSizingInput) -> CalculationResult:
 
         # Intermediate Transparency Values (Required for UI Side-Panel)
         "intermediate_values": {
+            "t_cell_cold_c": round(t_cell_cold_c, 2),
+            "t_cell_hot_c": round(t_cell_hot_c, 2),
             "v_oc_module_max_cold_v": round(v_oc_mod_max_cold, 2),
             "v_mp_module_min_hot_v": round(v_mp_mod_min_hot, 2),
             "i_sc_module_max_hot_a": round(i_sc_mod_max_hot, 2),
             "v_oc_string_max_site_v": round(v_oc_string_max_site, 2),
             "v_mppt_string_min_site_v": round(v_mppt_string_min_site, 2),
-            "delta_t_cold_c": delta_t_min,
-            "delta_t_hot_c": delta_t_max
+            "delta_t_cold_c": round(delta_t_cold, 2),
+            "delta_t_hot_c": round(delta_t_hot, 2)
         }
     }
 
