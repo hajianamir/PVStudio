@@ -1,6 +1,6 @@
 """
 C&I Market Segment Distinct 9-Step Workflow Menu Tree Architecture
-Per Technical Specification §2.2 & §7.1 & Sprint 1 Structural Fix
+Per Technical Specification §2.2, §7.1 & Sprint 2 Terminology Fix
 """
 
 from typing import List, Dict, Any
@@ -79,8 +79,8 @@ class CommercialIndustrialWorkflowTree(BaseModel):
         WorkflowStep(
             step_number=9,
             step_id="cand_i_permit_package",
-            title="9. C&I Permit-Ready Package & Interconnection Brief",
-            description="Export permit-ready 3-line SLD, site layout drawing, verified BOQ, and utility interconnection brief.",
+            title="9. C&I Permit-Ready Package Export",
+            description="Export permit-ready Single-Line Diagram (SLD), site layout drawing, verified BOQ, and utility interconnection brief.",
             required_inputs=["signed_compliance_profile", "drawing_stamps"]
         )
     ]
