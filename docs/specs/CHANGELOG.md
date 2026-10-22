@@ -12,7 +12,7 @@
 
 * Registered derived execution document `docs/specs/PHASE_1_RESIDENTIAL_MVP.md` as a subordinate engineering execution plan (non-authoritative, subordinate to frozen v1.0.0 master spec).
 * Standardized version tag across all specification documents to canonical Semantic Versioning `Version: 1.0.0`.
-* Reconciled file count references across handover note, changelog, and executive summary (15 files in `docs/specs/` + 1 root index `SPECIFICATION.md` = 16 files total).
+* Reconciled file count references across handover note, changelog, and executive summary (17 total files: 16 files in `docs/specs/` + 1 root index `SPECIFICATION.md`).
 * Locked and frozen specification suite under git tag `spec-v1.0-final`.
 
 ---

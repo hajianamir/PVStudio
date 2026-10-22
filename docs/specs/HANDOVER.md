@@ -12,14 +12,15 @@ Change Control: Frozen. Any change requires a v1.1 change request.
 
 The complete Technical Product Specification suite for **PVStudio** has been finalized, validated, and frozen as version **1.0.0**.
 
-### Primary Artifacts Package (15 Files in `docs/specs/` + 1 Root Index = 16 Files Total)
+### Primary Artifacts Package (17 Total Files: 16 Files in `docs/specs/` + 1 Root Index `SPECIFICATION.md`)
 
 1. **Root Navigation Index:** [`SPECIFICATION.md`](../../SPECIFICATION.md)
 2. **Master Product Specification:** [`PVStudio_Technical_Product_Specification.md`](PVStudio_Technical_Product_Specification.md)
 3. **Executive Summary:** [`EXECUTIVE_SUMMARY.md`](EXECUTIVE_SUMMARY.md)
 4. **Specification Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 5. **Handover Note:** [`HANDOVER.md`](HANDOVER.md)
-6. **Sub-Specs Directory (`docs/specs/`):**
+6. **Phase 1 Execution Plan:** [`PHASE_1_RESIDENTIAL_MVP.md`](PHASE_1_RESIDENTIAL_MVP.md)
+7. **Sub-Specs Directory (`docs/specs/`):**
    * `00_index.md` — Navigation hub & C4 shared technical terms glossary
    * `01_architecture.md` — C4 system architecture, Celery orchestration, disaster recovery
    * `02_data_model.md` — Relational, PostGIS, TimescaleDB, & audit trail ERD schemas
