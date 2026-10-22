@@ -1,6 +1,6 @@
 """
-C&I Market Segment Distinct 8-Step Workflow Menu Tree Architecture
-Per Technical Specification §2.2 & §7.1 (Distinct from Residential 5-Step Flow)
+C&I Market Segment Distinct 9-Step Workflow Menu Tree Architecture
+Per Technical Specification §2.2 & §7.1 & Sprint 1 Structural Fix
 """
 
 from typing import List, Dict, Any
@@ -18,7 +18,7 @@ class WorkflowStep(BaseModel):
 
 class CommercialIndustrialWorkflowTree(BaseModel):
     segment: str = "COMMERCIAL_INDUSTRIAL"
-    total_steps: int = 8
+    total_steps: int = 9
     workflow_steps: List[WorkflowStep] = [
         WorkflowStep(
             step_number=1,
@@ -72,13 +72,20 @@ class CommercialIndustrialWorkflowTree(BaseModel):
         WorkflowStep(
             step_number=8,
             step_id="cand_i_financial_model",
-            title="8. C&I Financial Model & Permit Package",
-            description="Demand-charge peak shaving, IRR, NPV, LCOE, permit-ready 3-line SLD export.",
+            title="8. C&I Financial Model & Cash Flows",
+            description="Demand-charge peak shaving, IRR, NPV, LCOE, degradation-adjusted 25-year cash flows.",
             required_inputs=["retail_tou_tariff", "demand_charge_usd_kw"]
+        ),
+        WorkflowStep(
+            step_number=9,
+            step_id="cand_i_permit_package",
+            title="9. C&I Permit-Ready Package & Interconnection Brief",
+            description="Export permit-ready 3-line SLD, site layout drawing, verified BOQ, and utility interconnection brief.",
+            required_inputs=["signed_compliance_profile", "drawing_stamps"]
         )
     ]
 
 
 def get_cand_i_workflow_tree() -> CommercialIndustrialWorkflowTree:
-    """Returns the C&I distinct 8-step workflow object."""
+    """Returns the C&I distinct 9-step workflow object."""
     return CommercialIndustrialWorkflowTree()
