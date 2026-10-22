@@ -1,14 +1,15 @@
 """
 WeatherProvider Interface, Dataset Metadata & Cross-Validation Constants
-Per Phase 1 Technical Specification §3.2 & Sprint 2 Mandate
+Per Phase 1 Technical Specification §3.2 & Action Item 5
 """
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
-# Versioned, named cross-validation GHI tolerance constant
+# Versioned, named cross-validation constants
 CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT: float = 5.0
+CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C: float = 3.0
 
 
 class DatasetMetadata(BaseModel):
@@ -34,8 +35,10 @@ class CrossValidationResult(BaseModel):
     primary_provider: DatasetMetadata
     secondary_provider: DatasetMetadata
     ghi_divergence_percent: float
-    tolerance_threshold_percent: float = CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT
-    status: str = Field(..., description="MATCH if divergence <= threshold, MANUAL_REVIEW_REQUIRED if > threshold")
+    temp_divergence_deg_c: float
+    ghi_tolerance_threshold_percent: float = CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT
+    temp_tolerance_threshold_deg_c: float = CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C
+    status: str = Field(..., description="MATCH if within thresholds, MANUAL_REVIEW_REQUIRED if exceeded")
 
 
 class WeatherProvider(ABC):
@@ -113,13 +116,23 @@ def cross_validate_weather(lat: float, lon: float) -> CrossValidationResult:
     pvgis_ghi = pvgis.get_irradiance(lat, lon).ghi_wm2[0]
     nasa_ghi = nasa.get_irradiance(lat, lon).ghi_wm2[0]
 
-    div_percent = abs(pvgis_ghi - nasa_ghi) / pvgis_ghi * 100.0
-    status_str = "MATCH" if div_percent <= CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT else "MANUAL_REVIEW_REQUIRED"
+    pvgis_temp = pvgis.get_temperature(lat, lon).temp_air_c[0]
+    nasa_temp = nasa.get_temperature(lat, lon).temp_air_c[0]
+
+    ghi_div_percent = abs(pvgis_ghi - nasa_ghi) / pvgis_ghi * 100.0
+    temp_div_deg_c = abs(pvgis_temp - nasa_temp)
+
+    is_ghi_ok = ghi_div_percent <= CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT
+    is_temp_ok = temp_div_deg_c <= CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C
+
+    status_str = "MATCH" if (is_ghi_ok and is_temp_ok) else "MANUAL_REVIEW_REQUIRED"
 
     return CrossValidationResult(
         primary_provider=pvgis.get_metadata(),
         secondary_provider=nasa.get_metadata(),
-        ghi_divergence_percent=round(div_percent, 2),
-        tolerance_threshold_percent=CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT,
+        ghi_divergence_percent=round(ghi_div_percent, 2),
+        temp_divergence_deg_c=round(temp_div_deg_c, 2),
+        ghi_tolerance_threshold_percent=CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT,
+        temp_tolerance_threshold_deg_c=CROSS_VALIDATION_TEMP_TOLERANCE_DEG_C,
         status=status_str
     )
