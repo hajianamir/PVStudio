@@ -1,11 +1,14 @@
 """
-WeatherProvider Interface & Metadata Data Structures
-Per Phase 1 Technical Specification §3.2
+WeatherProvider Interface, Dataset Metadata & Cross-Validation Constants
+Per Phase 1 Technical Specification §3.2 & Sprint 2 Mandate
 """
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
+
+# Versioned, named cross-validation GHI tolerance constant
+CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT: float = 5.0
 
 
 class DatasetMetadata(BaseModel):
@@ -31,14 +34,15 @@ class CrossValidationResult(BaseModel):
     primary_provider: DatasetMetadata
     secondary_provider: DatasetMetadata
     ghi_divergence_percent: float
-    status: str = Field(..., description="MATCH if divergence <= 5%, MANUAL_REVIEW_REQUIRED if > 5%")
+    tolerance_threshold_percent: float = CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT
+    status: str = Field(..., description="MATCH if divergence <= threshold, MANUAL_REVIEW_REQUIRED if > threshold")
 
 
 class WeatherProvider(ABC):
 
     @abstractmethod
-    def get_metadata() -> DatasetMetadata:
-        """Returns dataset metadata stamp."""
+    def get_metadata(self) -> DatasetMetadata:
+        """Returns dataset metadata stamp with all 4 required fields."""
         pass
 
     @abstractmethod
@@ -64,7 +68,6 @@ class PVGISProvider(WeatherProvider):
         )
 
     def get_irradiance(self, lat: float, lon: float, year: int = 2020) -> IrradianceSeries:
-        # Stubbed 8760 hourly baseline values
         return IrradianceSeries(
             ghi_wm2=[200.0] * 8760,
             dni_wm2=[300.0] * 8760,
@@ -111,11 +114,12 @@ def cross_validate_weather(lat: float, lon: float) -> CrossValidationResult:
     nasa_ghi = nasa.get_irradiance(lat, lon).ghi_wm2[0]
 
     div_percent = abs(pvgis_ghi - nasa_ghi) / pvgis_ghi * 100.0
-    status_str = "MATCH" if div_percent <= 5.0 else "MANUAL_REVIEW_REQUIRED"
+    status_str = "MATCH" if div_percent <= CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT else "MANUAL_REVIEW_REQUIRED"
 
     return CrossValidationResult(
         primary_provider=pvgis.get_metadata(),
         secondary_provider=nasa.get_metadata(),
         ghi_divergence_percent=round(div_percent, 2),
+        tolerance_threshold_percent=CROSS_VALIDATION_ANNUAL_GHI_TOLERANCE_PCT,
         status=status_str
     )
