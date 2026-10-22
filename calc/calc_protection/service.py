@@ -1,7 +1,7 @@
 """
-calc_protection: Basic Breaker, Fuse & SPD Selection Package
-Per Technical Specification §4.4 Module 5 & Sprint 3 Scope
-Calculates string gPV fuse rating, AC circuit breaker sizing, and SPD class selection.
+calc_protection: Profile-Driven Breaker, Fuse & SPD Selection Package
+Per Technical Specification §4.4 Module 5 & Critical Issue 2 Fix
+Standards citations are strictly driven by active jurisdiction profile (US UL vs EU IEC).
 """
 
 from pydantic import BaseModel, Field
@@ -15,12 +15,26 @@ class ProtectionInput(BaseModel):
     profile_id: str = Field(default="US-NEC-2020-v1")
 
 
+PROFILE_PROTECTION_CITATIONS = {
+    "US-NEC-2020-v1": {
+        "fuse_standard": "UL 2579 (per NEC 690.9)",
+        "breaker_standard": "UL 489 / NEC 240",
+        "spd_standard": "UL 1449 Type 1 or Type 2"
+    },
+    "EU-DE-v1": {
+        "fuse_standard": "IEC 60269-6 (gPV)",
+        "breaker_standard": "IEC 60364-4-43",
+        "spd_standard": "IEC 61643-11 Class II"
+    }
+}
+
+
 def calculate_protection(inputs: ProtectionInput) -> CalculationResult:
-    # String fuse required if parallel strings >= 3
+    citations = PROFILE_PROTECTION_CITATIONS.get(inputs.profile_id, PROFILE_PROTECTION_CITATIONS["US-NEC-2020-v1"])
+
     is_dc_fuse_required = inputs.parallel_strings >= 3
     recommended_fuse_rating_a = round(inputs.i_sc_stc_a * 1.56, 1) if is_dc_fuse_required else 0.0
 
-    # AC Breaker sizing (1.25 continuous factor, round up to standard breaker sizes)
     raw_breaker = inputs.i_ac_nominal_a * 1.25
     standard_breakers = [16, 20, 25, 32, 40, 50, 63]
     selected_breaker_a = next((b for b in standard_breakers if b >= raw_breaker), 63)
@@ -33,14 +47,15 @@ def calculate_protection(inputs: ProtectionInput) -> CalculationResult:
         calc_version="1.0.0",
         input_hash=input_hash,
         profile_id=inputs.profile_id,
-        standards_referenced=["IEC 60269-6", "NEC Article 690.9"]
+        standards_referenced=[citations["fuse_standard"], citations["breaker_standard"], citations["spd_standard"]]
     )
 
     outputs = {
         "is_dc_fuse_required": is_dc_fuse_required,
         "recommended_fuse_rating_a": recommended_fuse_rating_a,
         "recommended_ac_breaker_a": selected_breaker_a,
-        "recommended_spd_type": "TYPE_2_DC_AND_AC"
+        "recommended_spd_type": "TYPE_2_DC_AND_AC",
+        "standard_citations": citations
     }
 
     return CalculationResult(

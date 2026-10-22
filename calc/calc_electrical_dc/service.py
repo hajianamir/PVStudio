@@ -1,7 +1,7 @@
 """
 calc_electrical_dc: DC Cable Sizing, Ampacity & Voltage Drop Package
-Per Technical Specification §4.4 Module 3 & Sprint 3 Scope
-Calculates copper/aluminum cable sizing, ampacity derating, and DC voltage drop.
+Per Technical Specification §4.4 Module 3 & Critical Issue 3 Fix
+Ampacity factor is strictly profile-driven (e.g. 1.25x for NEC 2020 / IEC 60364-7-712).
 """
 
 from pydantic import BaseModel, Field
@@ -17,9 +17,21 @@ class DCElectricalInput(BaseModel):
     profile_id: str = Field(default="US-NEC-2020-v1")
 
 
+PROFILE_DC_AMPACITY_FACTORS = {
+    "US-NEC-2020-v1": {"factor": 1.25, "citation": "NEC 2020 Article 690.8(B)"},
+    "US-NEC-2017-v1": {"factor": 1.5625, "citation": "NEC 2017 Article 690.8"},
+    "EU-DE-v1": {"factor": 1.25, "citation": "IEC 60364-7-712 Section 712.522"}
+}
+
+
 def calculate_dc_electrical(inputs: DCElectricalInput) -> CalculationResult:
-    # 1. Ampacity requirement (NEC 690.8: 1.25 * 1.25 * Isc = 1.56 * Isc)
-    required_ampacity_a = inputs.i_sc_a * 1.56
+    # Look up profile-driven ampacity factor
+    profile_info = PROFILE_DC_AMPACITY_FACTORS.get(inputs.profile_id, PROFILE_DC_AMPACITY_FACTORS["US-NEC-2020-v1"])
+    ampacity_factor = profile_info["factor"]
+    citation = profile_info["citation"]
+
+    # Profile-driven ampacity requirement
+    required_ampacity_a = inputs.i_sc_a * ampacity_factor
 
     # Select standard cross section (4.0 mm2 or 6.0 mm2 default for residential)
     selected_mm2 = 6.0 if required_ampacity_a > 30.0 else 4.0
@@ -41,10 +53,12 @@ def calculate_dc_electrical(inputs: DCElectricalInput) -> CalculationResult:
         calc_version="1.0.0",
         input_hash=input_hash,
         profile_id=inputs.profile_id,
-        standards_referenced=["NEC 2020 Article 690.8", "IEC 60364-5-52"]
+        standards_referenced=[citation]
     )
 
     outputs = {
+        "applied_ampacity_factor": ampacity_factor,
+        "standard_reference": citation,
         "required_ampacity_a": round(required_ampacity_a, 2),
         "selected_cable_mm2": selected_mm2,
         "voltage_drop_volts": round(v_drop_volts, 2),
