@@ -1,7 +1,7 @@
 """
 Proposal Generator Service
 Per Technical Specification §5.3 & Gate Criteria G5/G6
-Generates proposal HTML/PDF text layers responding dynamically to SectionToggles, BrandingConfig, and Weather Metadata.
+Generates proposal HTML/PDF text layers responding dynamically to SectionToggles, BrandingConfig, Weather Metadata, and 3D Viewport Embed.
 """
 
 from typing import Dict, Any
@@ -16,10 +16,12 @@ class ProposalGeneratorService:
         calc_results: Dict[str, Any],
         weather_meta: DatasetMetadata,
         report_config: ReportConfig,
-        watermark_header: str = ""
+        watermark_header: str = "",
+        embedded_3d_viewport_image_b64: str = ""
     ) -> Dict[str, Any]:
         """
-        Generates document text layer rendering section toggles, white-label branding, and G5 weather metadata.
+        Generates document text layer rendering section toggles, white-label branding,
+        G5 weather metadata, and embedded 3D roof viewport screenshots.
         """
         sections_rendered = []
 
@@ -35,7 +37,8 @@ class ProposalGeneratorService:
             sections_rendered.append("SECTION 1: Executive Summary & System Overview")
 
         if toggles.include_3d_roof_layout:
-            sections_rendered.append("SECTION 2: 3D Roof Layout & Shading Heatmap Overlay")
+            viewport_embed_text = " [3D R3F VIEWPORT EMBEDDED]" if embedded_3d_viewport_image_b64 else ""
+            sections_rendered.append(f"SECTION 2: 3D Roof Layout & Shading Heatmap Overlay{viewport_embed_text}")
 
         if toggles.include_system_bill_of_materials:
             sections_rendered.append("SECTION 3: System Bill of Materials (BOM)")
@@ -70,6 +73,7 @@ WEATHER DATASET METADATA (GATE CRITERION G5 STAMP):
             "sections_list": sections_rendered,
             "weather_metadata_stamp": weather_block.strip(),
             "standards_text": standards_text,
+            "has_embedded_3d_viewport": bool(embedded_3d_viewport_image_b64),
             "page_1_text_layer": f"{header_text}\n{weather_block.strip()}\n{sections_rendered[0] if sections_rendered else ''}",
             "page_n_text_layer": f"{header_text}\n{sections_rendered[-1] if sections_rendered else ''}"
         }
