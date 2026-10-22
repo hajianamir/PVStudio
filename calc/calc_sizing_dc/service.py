@@ -1,8 +1,8 @@
 """
 calc_sizing_dc: Module-Inverter String Sizing Calculation Package
-Finalized per Technical Specification §4.4 Module 2 & Sprint 3 Scope
-Includes NOCT-based cell temperature model under irradiance:
-  T_cell = T_ambient + ((NOCT - 20) / 800) * G
+Finalized per Technical Specification §4.4 Module 2 & Sprint 4 Clarification 2
+Cold Voc: Standard T_cell = T_ambient_min (zero irradiance extreme) per NEC 690.7 / IEC 62548 §7.2.4
+Hot Vmp: NOCT cell temperature derating T_cell_hot = T_ambient_max + ((NOCT - 20) / 800) * G
 """
 
 import math
@@ -12,35 +12,35 @@ from calc.provenance import CalculationResult, ProvenanceEnvelope, compute_input
 
 
 class DCSizingInput(BaseModel):
-    v_oc_stc: float = Field(..., gt=0, description="Module Voc at STC [V]")
-    v_mp_stc: float = Field(..., gt=0, description="Module Vmp at STC [V]")
+    v_oc_stc: float = Field(default=49.5, gt=0, description="Module Voc at STC [V]")
+    v_mp_stc: float = Field(default=41.2, gt=0, description="Module Vmp at STC [V]")
     i_sc_stc: float = Field(default=13.5, gt=0, description="Module Isc at STC [A]")
     i_mp_stc: float = Field(default=12.8, gt=0, description="Module Imp at STC [A]")
     noct_c: float = Field(default=45.0, gt=20, le=60, description="Nominal Operating Cell Temperature [°C]")
-    irradiance_cold_wm2: float = Field(default=1000.0, ge=0, le=1400, description="Design cold irradiance level [W/m2]")
-    temp_coeff_voc_percent: float = Field(..., lt=0, description="Voc temperature coefficient [%/°C]")
-    temp_coeff_pmp_percent: float = Field(..., lt=0, description="Pmp temperature coefficient [%/°C]")
-    site_temp_min_c: float = Field(..., ge=-60, le=50, description="Record minimum ambient temp [°C]")
-    site_temp_max_c: float = Field(..., ge=10, le=65, description="Record maximum ambient temp [°C]")
-    inverter_v_max_dc: float = Field(..., gt=0, description="Inverter max allowable DC voltage [V]")
-    inverter_v_mppt_min: float = Field(..., gt=0, description="Inverter min MPPT voltage [V]")
-    inverter_v_mppt_max: float = Field(..., gt=0, description="Inverter max MPPT voltage [V]")
+    temp_coeff_voc_percent: float = Field(default=-0.28, lt=0, description="Voc temperature coefficient [%/°C]")
+    temp_coeff_pmp_percent: float = Field(default=-0.35, lt=0, description="Pmp temperature coefficient [%/°C]")
+    site_temp_min_c: float = Field(default=-10.0, ge=-60, le=50, description="Record minimum ambient temp [°C]")
+    site_temp_max_c: float = Field(default=40.0, ge=10, le=65, description="Record maximum ambient temp [°C]")
+    inverter_v_max_dc: float = Field(default=1000.0, gt=0, description="Inverter max allowable DC voltage [V]")
+    inverter_v_mppt_min: float = Field(default=200.0, gt=0, description="Inverter min MPPT voltage [V]")
+    inverter_v_mppt_max: float = Field(default=800.0, gt=0, description="Inverter max MPPT voltage [V]")
     total_modules_count: int = Field(default=18, gt=0, description="Total planned array module count")
     profile_id: str = Field(default="US-NEC-2020-v1")
 
 
 def calculate_dc_sizing(inputs: DCSizingInput) -> CalculationResult:
     """
-    Finalized String Sizing Calculator using NOCT cell temperature modeling per IEC 62548.
-    T_cell_cold = site_temp_min_c + ((noct_c - 20) / 800) * irradiance_cold_wm2
+    Finalized String Sizing Calculator per NEC 690.7 & IEC 62548 §7.2.4.
+    Cold Voc: T_cell_cold = T_ambient_min (zero-irradiance cold extreme).
+    Hot Vmp: T_cell_hot = T_ambient_max + ((NOCT - 20) / 800) * 1000 (1000 W/m2 NOCT cell temp).
     """
-    # 1. Cold Temperature Window (NOCT-based cell temp under irradiance)
-    t_cell_cold_c = inputs.site_temp_min_c + ((inputs.noct_c - 20.0) / 800.0) * inputs.irradiance_cold_wm2
+    # 1. Cold Temperature Window (Zero-irradiance cold extreme per NEC 690.7)
+    t_cell_cold_c = inputs.site_temp_min_c
     delta_t_cold = t_cell_cold_c - 25.0
     v_oc_mod_max_cold = inputs.v_oc_stc * (1.0 + (inputs.temp_coeff_voc_percent / 100.0) * delta_t_cold)
     max_modules_per_string = int(inputs.inverter_v_max_dc // v_oc_mod_max_cold)
 
-    # 2. Hot Temperature Window (Min Vmp & Max Isc)
+    # 2. Hot Temperature Window (NOCT-based cell temp under 1000 W/m2 irradiance)
     t_cell_hot_c = inputs.site_temp_max_c + ((inputs.noct_c - 20.0) / 800.0) * 1000.0
     delta_t_hot = t_cell_hot_c - 25.0
     v_mp_mod_min_hot = inputs.v_mp_stc * (1.0 + (inputs.temp_coeff_pmp_percent / 100.0) * delta_t_hot)
