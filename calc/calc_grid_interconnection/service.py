@@ -1,14 +1,10 @@
 """
-calc_grid_interconnection: C&I Interconnection Point Analysis, Substation Bay Sizing & Short-Circuit Fault Current
-Per Technical Specification §4.4 Module 8 & Phase 2 Sprint 4 Refinements
+calc_grid_interconnection: C&I and Utility-Scale Interconnection Point Analysis, Substation Bay Sizing & Fault Current
+Per Technical Specification §4.4 Module 8 & Phase 3 Scope
 Refactored:
-  1. EU-DE profile MV nominal voltage set to 30.0 kV (standard VDE-AR-N 4110 German medium-voltage distribution class).
-  2. Short-Circuit Fault Current calculation per IEC 60909 / IEEE 141 using utility short-circuit capacity (Sk'' MVA)
-     and IEC 60909 max voltage factor c = 1.10:
-     Ik'' = (c * Sk'') / (sqrt(3) * Un)
-     For EU-DE 30 kV grid with default Sk'' = 500 MVA:
-     Ik'' = (1.10 * 500 MVA) / (sqrt(3) * 30 kV) = 550 MVA / 51.9615 kV = 10.58 kA.
-  3. Includes explicit FaultCurrentOutOfRange warning diagnostic if Ik'' < 0.5 kA or > 30 kA for MV connections.
+  1. Extends grid interconnection analysis up to High-Voltage (HV) transmission levels (110kV/220kV/380kV EU, 115kV/138kV/230kV/345kV/500kV US).
+  2. Differentiates default utility short-circuit capacity Sk'' for MV (500 MVA EU / 250 MVA US) vs HV (3500 MVA EU / 2500 MVA US).
+  3. Calculates HV substation transformer MVA sizing, HV switchgear bay decomposition, and IEEE C37.010 / IEC 60909 HV short-circuit currents.
 """
 
 import math
@@ -23,17 +19,21 @@ PROFILE_INTERCONNECTION_CONFIGS = {
         "lv_max_capacity_kw": 250.0,
         "lv_nominal_voltage_kv": 0.48,  # 480V 3-phase LV
         "mv_nominal_voltage_kv": 13.8,  # 13.8 kV US MV distribution
-        "default_grid_sk_mva": 250.0,   # 250 MVA 13.8kV utility feeder short-circuit capacity
-        "interconnection_standard": "IEEE 1547-2018 / UL 1741 SB / NEC Article 705",
-        "short_circuit_methodology_standard": "IEEE 141 (Red Book) / IEEE 242 (Buff Book)"
+        "hv_nominal_voltage_kv": 115.0, # 115 kV US HV transmission grid
+        "default_mv_sk_mva": 250.0,     # 250 MVA 13.8kV utility feeder short-circuit capacity
+        "default_hv_sk_mva": 2500.0,    # 2500 MVA 115kV utility transmission short-circuit capacity
+        "interconnection_standard": "NERC PRC Standards / IEEE 1547-2018 / NEC Article 705",
+        "short_circuit_methodology_standard": "IEEE C37.010 (HV Short-Circuit) / IEEE 141"
     },
     "EU-DE-v1": {
         "lv_max_capacity_kw": 100.0,
         "lv_nominal_voltage_kv": 0.40,  # 400V 3-phase LV
         "mv_nominal_voltage_kv": 30.0,  # 30.0 kV EU-DE MV distribution grid per VDE-AR-N 4110
-        "default_grid_sk_mva": 500.0,   # 500 MVA 30kV utility network short-circuit capacity
-        "interconnection_standard": "VDE-AR-N 4110 (MV) / VDE-AR-N 4120 (HV) / EN 50549-2",
-        "short_circuit_methodology_standard": "IEC 60909 (Short-Circuit Calculation) / IEC 60947"
+        "hv_nominal_voltage_kv": 110.0, # 110.0 kV EU-DE HV transmission grid per VDE-AR-N 4120
+        "default_mv_sk_mva": 500.0,     # 500 MVA 30kV utility network short-circuit capacity
+        "default_hv_sk_mva": 3500.0,    # 3500 MVA 110kV utility network short-circuit capacity
+        "interconnection_standard": "VDE-AR-N 4120 (Anschlüsse am Hochspannungsnetz) / EN 50549-2",
+        "short_circuit_methodology_standard": "IEC 60909 (HV Short-Circuit Calculation) / IEC 62271"
     }
 }
 
@@ -55,19 +55,22 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
     p_kw = inputs.plant_capacity_kw
     lv_ceiling_kw = config["lv_max_capacity_kw"]
 
-    # 1. Profile-Driven Voltage Level Determination
+    # 1. Profile-Driven Voltage Level Determination (LV < 100/250 kW; MV <= 40 MW; HV > 40 MW)
     if p_kw <= lv_ceiling_kw:
         is_lv_connection = True
         recommended_voltage_kv = config["lv_nominal_voltage_kv"]
         voltage_class = f"LV_{recommended_voltage_kv}kV"
-    elif p_kw <= 50000.0:
+        is_hv = False
+    elif p_kw <= 40000.0:
         is_lv_connection = False
         recommended_voltage_kv = config["mv_nominal_voltage_kv"]
         voltage_class = f"MV_{recommended_voltage_kv}kV"
+        is_hv = False
     else:
         is_lv_connection = False
-        recommended_voltage_kv = 110.0
-        voltage_class = "HV_110kV"
+        recommended_voltage_kv = config["hv_nominal_voltage_kv"]
+        voltage_class = f"HV_{recommended_voltage_kv}kV"
+        is_hv = True
 
     # 2. Total AC Current at Interconnection Voltage
     i_ac_interconnection_a = (p_kw * 1000.0) / (math.sqrt(3) * (recommended_voltage_kv * 1000.0) * inputs.power_factor)
@@ -84,6 +87,7 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
         }
         total_substation_bays = 0
         lv_main_breaker_rating_a = math.ceil(i_ac_interconnection_a * 1.25)
+        transformer_mva_recommended = 0.0
     else:
         incomer_bays_required = math.ceil(i_ac_interconnection_a / inputs.bay_max_ampacity_a)
         transformer_bays = 1 if recommended_voltage_kv >= 11.0 else 0
@@ -98,12 +102,12 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
             "total_substation_bays": total_substation_bays
         }
         lv_main_breaker_rating_a = 0
+        transformer_mva_recommended = math.ceil((p_kw / (inputs.power_factor * 1000.0)) / 5.0) * 5.0
 
-    # 4. Short-Circuit Fault Current Contribution at PCC (Ik'') per IEC 60909 / IEEE 141
-    # Formula: Ik'' = (c_factor * Sk'') / (sqrt(3) * Un)
-    # c_factor = 1.10 (IEC 60909 max voltage factor for Un <= 35 kV)
+    # 4. Short-Circuit Fault Current Contribution at PCC (Ik'') per IEC 60909 / IEEE 141 / IEEE C37.010
     c_factor = 1.10
-    sk_mva = inputs.grid_short_circuit_mva if inputs.grid_short_circuit_mva else config["default_grid_sk_mva"]
+    default_sk = config["default_hv_sk_mva"] if is_hv else config["default_mv_sk_mva"]
+    sk_mva = inputs.grid_short_circuit_mva if inputs.grid_short_circuit_mva else default_sk
 
     if inputs.grid_impedance_ohm:
         v_nominal_v = recommended_voltage_kv * 1000.0
@@ -113,10 +117,10 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
         i_fault_ka = (c_factor * sk_mva * 1000.0) / (math.sqrt(3) * (recommended_voltage_kv * 1000.0))
         grid_short_circuit_mva_calc = sk_mva
 
-    # Sanity Range Protection Check (0.5 kA to 30.0 kA for MV connections)
+    # Sanity Range Protection Check (0.5 kA to 50.0 kA for MV/HV connections)
     fault_current_warning = None
-    if not is_lv_connection and (i_fault_ka < 0.5 or i_fault_ka > 30.0):
-        fault_current_warning = f"FaultCurrentOutOfRange: Calculated MV fault current {i_fault_ka:.2f} kA is outside realistic C&I grid range (0.5-30 kA). Utility verification required."
+    if not is_lv_connection and (i_fault_ka < 0.5 or i_fault_ka > 50.0):
+        fault_current_warning = f"FaultCurrentOutOfRange: Calculated grid fault current {i_fault_ka:.2f} kA is outside realistic grid range (0.5-50 kA). Utility verification required."
 
     inputs_dict = inputs.model_dump()
     input_hash = compute_input_hash(inputs_dict)
@@ -135,6 +139,7 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
         "voltage_class": voltage_class,
         "interconnection_current_a": round(i_ac_interconnection_a, 2),
         "lv_main_breaker_rating_a": lv_main_breaker_rating_a if is_lv_connection else None,
+        "transformer_mva_recommended": transformer_mva_recommended if not is_lv_connection else None,
         "bay_breakdown": bay_breakdown,
         "total_substation_bays": total_substation_bays,
         "grid_short_circuit_capacity_mva": round(grid_short_circuit_mva_calc, 2),

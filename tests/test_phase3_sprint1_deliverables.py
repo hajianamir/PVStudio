@@ -2,7 +2,7 @@
 Automated CI Integration Tests for Phase 3 Sprint 1 Utility-Scale Core Deliverables
 Per Technical Specification §4.4 & Phase 3 Scope
 Asserts:
-  - calc_bankability 10,000-iteration Monte Carlo P50/P75/P90 yield simulation & DSCR coverage under 6.26% utility RSS uncertainty
+  - calc_bankability 10,000-iteration Monte Carlo P50/P75/P90 yield simulation & 20-year DSCR schedule
   - calc_recommender central vs string inverter topology recommendation decision rules (B-R1 through B-R4)
   - Profile-driven HV transmission voltage levels (110kV/220kV/380kV EU vs 115kV/138kV/230kV/345kV/500kV US)
 """
@@ -10,33 +10,40 @@ Asserts:
 import pytest
 from calc.calc_bankability.service import BankabilityInputSchema, calculate_bankability_monte_carlo
 from calc.calc_recommender.service import TopologyRecommenderInput, recommend_inverter_topology
-from calc.calc_grid_interconnection.service import PROFILE_INTERCONNECTION_CONFIGS
+from calc.calc_grid_interconnection.service import InterconnectionInput, calculate_grid_interconnection, PROFILE_INTERCONNECTION_CONFIGS
 
 
 def test_calc_bankability_monte_carlo_p50_p75_p90_convergence():
-    # 50 MW Utility-Scale Plant Bankability Simulation (Southern Spain 1400 kWh/kWp)
+    # 50 MW AC / 53.5 MW DC Utility-Scale Plant Bankability Simulation (Seville, Spain POA 2050 kWh/m2, 81.5% PR)
     inputs = BankabilityInputSchema(
         plant_capacity_kw=50000.0,
-        annual_p50_yield_kwh=70010000.0,  # 70.01 GWh P50
+        annual_p50_yield_kwh=89385875.0,  # 89.39 GWh P50
         iterations=10000,
-        debt_service_annual_usd=2000000.0,
-        net_operating_income_year1_usd=2800000.0,
+        debt_service_annual_usd=2500000.0,
+        net_operating_income_year1_usd=3600000.0,
+        loan_tenor_years=20,
         profile_id="EU-DE-v1"
     )
     result = calculate_bankability_monte_carlo(inputs)
     outputs = result.outputs
 
     assert outputs["sigma_total_percent"] == 6.26  # Utility 9-term RSS uncertainty (sqrt(39.13) = 6.26%)
-    assert outputs["p50_yield_kwh"] > outputs["p75_yield_kwh"] > outputs["p90_yield_kwh"]
+    assert abs(outputs["p50_yield_gwh"] - 89.39) <= 0.03
+    assert abs(outputs["p90_yield_gwh"] - 82.21) <= 0.10
     assert outputs["p90_p50_ratio"] == 0.919
-    assert outputs["dscr_p50"] == 1.40
-    assert outputs["dscr_p90"] == 1.29
+    assert abs(outputs["specific_yield_ac_kwh_kwac_yr"] - 1787.7) <= 1.0
+    assert abs(outputs["specific_yield_dc_kwh_kwp_yr"] - 1670.8) <= 1.0
+    assert outputs["performance_ratio_pr"] == 0.815
+    assert len(outputs["dscr_twenty_year_schedule"]) == 20
+    assert outputs["dscr_year1_p90"] == 1.32
+    assert outputs["minimum_dscr_p90"] == 1.20  # Minimum DSCR occurring in Year 20 due to 0.5%/yr degradation
+    assert outputs["minimum_dscr_year"] == 20
     assert outputs["is_bankable_dscr_compliant"] is True
 
     # SAM 2023.12.08 Reference Harness Comparison
     sam = outputs["sam_reference_baseline_comparison"]
-    assert sam["sam_p90_yield_kwh"] == 64540000.0
-    assert sam["delta_percent"] == 0.15
+    assert sam["sam_p90_yield_kwh"] == 82450000.0
+    assert sam["delta_percent"] == 0.35  # Structural RSS vs Monte Carlo delta
     assert "NREL SAM 2023.12.08 Stochastic Yield Baseline" in result.provenance.standards_referenced
 
 
@@ -77,7 +84,17 @@ def test_calc_recommender_topology_selection_benchmark_cases():
     assert r4_res.outputs["rule_applied"] == "RULE_4_MARGINAL_CAPEX_DELTA_STRING_DEFAULT"
 
 
-def test_profile_driven_hv_voltage_class_configuration():
-    # Profile-driven HV grid transmission level verification
-    assert PROFILE_INTERCONNECTION_CONFIGS["EU-DE-v1"]["mv_nominal_voltage_kv"] == 30.0
-    assert PROFILE_INTERCONNECTION_CONFIGS["US-NEC-2020-v1"]["mv_nominal_voltage_kv"] == 13.8
+def test_hv_substation_grid_interconnection_50mw():
+    # 50 MW Utility-Scale Plant Interconnection at 110 kV HV (EU-DE-v1)
+    hv_input = InterconnectionInput(
+        plant_capacity_kw=50000.0,
+        profile_id="EU-DE-v1"
+    )
+    hv_res = calculate_grid_interconnection(hv_input)
+    outputs = hv_res.outputs
+
+    assert outputs["voltage_class"] == "HV_110.0kV"
+    assert outputs["recommended_voltage_kv"] == 110.0
+    assert outputs["transformer_mva_recommended"] == 55.0  # 50MW / 0.95 = 52.6MVA -> 55 MVA
+    assert outputs["short_circuit_fault_current_ka"] == 20.21  # (1.10 * 3500) / (sqrt(3) * 110) = 20.21 kA
+    assert outputs["fault_current_warning"] is None
