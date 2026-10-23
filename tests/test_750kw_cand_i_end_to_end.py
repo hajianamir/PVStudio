@@ -9,7 +9,7 @@ Executes complete 750 kW C&I design across all 9 steps:
   Step 6: Civil / Structural Pads
   Step 7: Procurement BOQ
   Step 8: C&I Financial LCOE/NPV
-  Step 9: Permit Package (SLD, BOQ, Interconnection Brief)
+  Step 9: Permit Package (SLD SVG Vector Diagram, BOQ, Interconnection Brief)
 """
 
 import pytest
@@ -80,7 +80,7 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
     assert fin_res.outputs["lcoe_usd_kwh"] > 0.03
     assert fin_res.outputs["simple_payback_years"] < 5.0
 
-    # 6. Step 9: Permit Package Generation
+    # 6. Step 9: Permit Package Generation & Vector SVG Verification
     pkg_input = PermitPackageInput(
         project_id="PRJ_CAND_I_750KW_001",
         project_name="Apex Logistics Center 750kW Rooftop PV",
@@ -96,5 +96,8 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
 
     assert pkg_res.project_id == "PRJ_CAND_I_750KW_001"
     assert len(pkg_res.sld_metadata["nodes"]) == 6
+    assert "<svg" in pkg_res.rendered_sld_svg
+    assert "SINGLE-LINE DIAGRAM (SLD)" in pkg_res.rendered_sld_svg
+    assert "750.0 kW AC" in pkg_res.rendered_sld_svg
     assert len(pkg_res.boq_export) == 6
     assert pkg_res.interconnection_brief["short_circuit_capacity_ka"] == 20.0

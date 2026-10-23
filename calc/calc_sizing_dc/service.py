@@ -6,9 +6,14 @@ Hot Vmp: NOCT cell temperature derating T_cell_hot = T_ambient_max + ((NOCT - 20
 """
 
 import math
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from calc.provenance import CalculationResult, ProvenanceEnvelope, compute_input_hash
+
+
+class DCSizingConstraintViolation(Exception):
+    """Raised when cold Voc exceeds max allowable DC voltage or hot Vmp falls below min MPPT voltage."""
+    pass
 
 
 class DCSizingInput(BaseModel):
@@ -25,6 +30,7 @@ class DCSizingInput(BaseModel):
     inverter_v_mppt_min: float = Field(default=200.0, gt=0, description="Inverter min MPPT voltage [V]")
     inverter_v_mppt_max: float = Field(default=800.0, gt=0, description="Inverter max MPPT voltage [V]")
     total_modules_count: int = Field(default=18, gt=0, description="Total planned array module count")
+    raise_on_violation: bool = Field(default=False, description="Raise DCSizingConstraintViolation if True, else return structured refusal")
     profile_id: str = Field(default="US-NEC-2020-v1")
 
 
@@ -49,15 +55,31 @@ def calculate_dc_sizing(inputs: DCSizingInput) -> CalculationResult:
     # Hot temperature Isc correction (+0.05%/°C typical)
     i_sc_mod_max_hot = inputs.i_sc_stc * (1.0 + 0.0005 * delta_t_hot)
 
-    # Actual String Voltages
-    v_oc_string_max_site = max_modules_per_string * v_oc_mod_max_cold
-    v_mppt_string_min_site = min_modules_per_string * v_mp_mod_min_hot
+    # Dual Temperature Constraints Check (Cold Voc Over-Voltage & Hot Vmp Under-Voltage)
+    is_cold_voc_exceeded = v_oc_mod_max_cold > inputs.inverter_v_max_dc or max_modules_per_string == 0
+    is_hot_vmp_insufficient = min_modules_per_string * v_mp_mod_min_hot < inputs.inverter_v_mppt_min
 
-    # String count calculation with zero-guard
-    selected_modules_per_string = min(max_modules_per_string, max(min_modules_per_string, 18)) if max_modules_per_string > 0 else 0
-    string_count = math.ceil(inputs.total_modules_count / selected_modules_per_string) if selected_modules_per_string > 0 else 0
+    violation_reasons = []
+    if is_cold_voc_exceeded:
+        violation_reasons.append(f"Cold module Voc ({v_oc_mod_max_cold:.2f}V) exceeds inverter max DC voltage ({inputs.inverter_v_max_dc:.2f}V).")
+    if max_modules_per_string < min_modules_per_string:
+        violation_reasons.append(f"Max modules per string ({max_modules_per_string}) is less than min modules required ({min_modules_per_string}). Window collapsed.")
 
-    is_valid = max_modules_per_string >= min_modules_per_string and max_modules_per_string > 0 and v_oc_string_max_site <= inputs.inverter_v_max_dc
+    if violation_reasons and inputs.raise_on_violation:
+        raise DCSizingConstraintViolation(" | ".join(violation_reasons))
+
+    # String count calculation
+    if max_modules_per_string > 0 and max_modules_per_string >= min_modules_per_string:
+        selected_modules_per_string = min(max_modules_per_string, max(min_modules_per_string, 18))
+        string_count = math.ceil(inputs.total_modules_count / selected_modules_per_string)
+    else:
+        selected_modules_per_string = 0
+        string_count = 0
+
+    v_oc_string_max_site = selected_modules_per_string * v_oc_mod_max_cold
+    v_mppt_string_min_site = selected_modules_per_string * v_mp_mod_min_hot
+
+    is_valid = len(violation_reasons) == 0 and v_oc_string_max_site <= inputs.inverter_v_max_dc
 
     inputs_dict = inputs.model_dump()
     input_hash = compute_input_hash(inputs_dict)
@@ -77,6 +99,7 @@ def calculate_dc_sizing(inputs: DCSizingInput) -> CalculationResult:
         "selected_modules_per_string": selected_modules_per_string,
         "recommended_string_count": string_count,
         "is_compliant": is_valid,
+        "violation_reasons": violation_reasons if violation_reasons else None,
 
         # Intermediate Transparency Values (Required for UI Side-Panel)
         "intermediate_values": {

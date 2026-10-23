@@ -1,7 +1,7 @@
 """
 Permit Package Generator Service for Step 9 C&I Workflow
 Per Technical Specification §2.2 & Sprint 3 Scope
-Generates SLD metadata (single line / three line diagram), BOQ export, civil pad dimensions, and interconnection brief.
+Generates rendered vector SVG Single Line Diagram (SLD), line-item BOQ, civil pad specifications, and interconnection briefs.
 """
 
 from typing import Dict, Any, List
@@ -24,12 +24,69 @@ class PermitPackageOutput(BaseModel):
     project_id: str
     project_name: str
     sld_metadata: Dict[str, Any]
+    rendered_sld_svg: str = Field(..., description="Rendered engineering Vector SVG Single-Line Diagram for AHJ submission")
     boq_export: List[Dict[str, Any]]
     civil_structural_brief: Dict[str, Any]
     interconnection_brief: Dict[str, Any]
 
 
 class PermitPackageGeneratorService:
+    @staticmethod
+    def _render_vector_sld_svg(project_name: str, plant_capacity_kw: float, voltage_class: str, inverter_count: int, inverter_model: str) -> str:
+        """
+        Renders an engineering vector SVG Single-Line Diagram for AHJ permit submission.
+        """
+        svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" width="100%" height="100%">
+  <style>
+    .title {{ font-family: sans-serif; font-weight: bold; font-size: 18px; fill: #0f172a; }}
+    .subtitle {{ font-family: sans-serif; font-size: 12px; fill: #475569; }}
+    .box {{ fill: #f8fafc; stroke: #1e293b; stroke-width: 2; }}
+    .bus {{ stroke: #0f172a; stroke-width: 4; }}
+    .text {{ font-family: monospace; font-size: 11px; fill: #0f172a; }}
+    .symbol {{ fill: none; stroke: #2563eb; stroke-width: 2; }}
+  </style>
+
+  <!-- Title Block -->
+  <rect x="10" y="10" width="980" height="50" fill="#ffffff" stroke="#cbd5e1" />
+  <text x="25" y="32" class="title">SINGLE-LINE DIAGRAM (SLD) — {project_name}</text>
+  <text x="25" y="48" class="subtitle">Capacity: {plant_capacity_kw} kW AC | Grid Interconnection: {voltage_class} | Compliance Profile: IEC/IEEE</text>
+
+  <!-- PV Array Node -->
+  <rect x="50" y="100" width="160" height="80" class="box" />
+  <text x="60" y="130" class="text">PV ARRAY STAGE</text>
+  <text x="60" y="150" class="text">{inverter_count * 10}x Strings (1000V DC)</text>
+
+  <!-- DC Bus Line -->
+  <line x1="210" y1="140" x2="280" y2="140" class="bus" />
+
+  <!-- Inverters Block -->
+  <rect x="280" y="100" width="180" height="80" class="box" />
+  <text x="290" y="130" class="text">INVERTER BANK</text>
+  <text x="290" y="150" class="text">{inverter_count}x {inverter_model}</text>
+
+  <!-- AC Collection Bus (400V) -->
+  <line x1="460" y1="140" x2="540" y2="140" class="bus" />
+
+  <!-- LV/MV Step-Up Transformer -->
+  <rect x="540" y="100" width="160" height="80" class="box" />
+  <circle cx="600" cy="140" r="20" class="symbol" />
+  <circle cx="640" cy="140" r="20" class="symbol" />
+  <text x="550" y="170" class="text">LV/MV Transformer</text>
+
+  <!-- MV Bus (33kV / 13.8kV) -->
+  <line x1="700" y1="140" x2="780" y2="140" class="bus" />
+
+  <!-- MV Switchgear / PCC Breaker -->
+  <rect x="780" y="100" width="160" height="80" class="box" />
+  <text x="790" y="130" class="text">MV SWITCHGEAR</text>
+  <text x="790" y="150" class="text">Relay: ANSI 50/51/51N</text>
+
+  <!-- Utility Interconnection Arrow -->
+  <line x1="940" y1="140" x2="980" y2="140" class="bus" />
+  <polygon points="980,135 990,140 980,145" fill="#0f172a" />
+</svg>"""
+        return svg
+
     @staticmethod
     def generate_permit_package(inputs: PermitPackageInput) -> PermitPackageOutput:
         # 1. Single-Line Diagram (SLD) Schema Structure
@@ -50,6 +107,15 @@ class PermitPackageGeneratorService:
             ],
             "protection_relays_mapped": ["ANSI 50/51/51N (Overcurrent & Earth Fault)", "ANSI 27/59 (Voltage)", "ANSI 81O/U (Frequency)"]
         }
+
+        # Rendered vector SVG diagram
+        rendered_sld_svg = PermitPackageGeneratorService._render_vector_sld_svg(
+            project_name=inputs.project_name,
+            plant_capacity_kw=inputs.plant_capacity_kw,
+            voltage_class=inputs.voltage_class,
+            inverter_count=inputs.inverter_count,
+            inverter_model=inputs.inverter_model
+        )
 
         # 2. Bill of Quantities (BOQ) Export
         boq_export = [
@@ -83,6 +149,7 @@ class PermitPackageGeneratorService:
             project_id=inputs.project_id,
             project_name=inputs.project_name,
             sld_metadata=sld_metadata,
+            rendered_sld_svg=rendered_sld_svg,
             boq_export=boq_export,
             civil_structural_brief=civil_structural_brief,
             interconnection_brief=interconnection_brief

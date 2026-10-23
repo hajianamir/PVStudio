@@ -24,13 +24,15 @@ PROFILE_PROTECTION_CITATIONS = {
         "fuse_standard": "UL 2579 (per NEC 690.9)",
         "breaker_standard": "UL 489 / NEC 240",
         "spd_standard": "UL 1449 Type 1 or Type 2",
-        "mv_relay_standard": "IEEE C37.90 / IEEE 242 (Buff Book) / ANSI 50/51/51N",
+        "device_function_standard": "IEEE C37.2 (Standard for Device Function Numbers and ANSI Codes)",
+        "mv_relay_standard": "IEEE 242 (Buff Book Protection Coordination) / ANSI 50/51/51N",
         "ct_vt_standard": "IEEE C57.13 (Instrument Transformers)"
     },
     "EU-DE-v1": {
         "fuse_standard": "IEC 60269-6 (gPV)",
         "breaker_standard": "IEC 60364-4-43",
         "spd_standard": "IEC 61643-11 Class II",
+        "device_function_standard": "IEC 60255-1 (Measuring Relays and Protection Equipment)",
         "mv_relay_standard": "IEC 60255-151 / VDE-AR-N 4110 / ANSI 50/51/51N",
         "ct_vt_standard": "IEC 61869-2 (Current) / IEC 61869-3 (Voltage)"
     }
@@ -57,7 +59,7 @@ def calculate_protection(inputs: ProtectionInput) -> CalculationResult:
         recommended_ct_ratio = f"{next((ct for ct in standard_ct_primaries if ct >= raw_breaker), 2000)}/5A"
 
         relay_functions = ["50 (Instantaneous Overcurrent)", "51 (Time Overcurrent)", "51N (Earth Fault Overcurrent)", "27/59 (Under/Over Voltage)", "81O/U (Over/Under Frequency)"]
-        standards_ref = [citations["mv_relay_standard"], citations["ct_vt_standard"]]
+        standards_ref = [citations["device_function_standard"], citations["mv_relay_standard"], citations["ct_vt_standard"]]
     else:
         standard_lv_breakers = [16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 400, 630]
         selected_breaker_a = next((b for b in standard_lv_breakers if b >= raw_breaker), 630)

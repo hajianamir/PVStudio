@@ -45,4 +45,4 @@ def test_mv_numerical_relay_and_ct_vt_protection():
     assert outputs["recommended_ac_breaker_a"] == 630  # Standard MV Switchgear Breaker
     assert outputs["recommended_ct_ratio"] == "50/5A"
     assert "50 (Instantaneous Overcurrent)" in outputs["numerical_relay_functions"]
-    assert "IEEE C37.90 / IEEE 242 (Buff Book) / ANSI 50/51/51N" in result.provenance.standards_referenced
+    assert "IEEE C37.2 (Standard for Device Function Numbers and ANSI Codes)" in result.provenance.standards_referenced
