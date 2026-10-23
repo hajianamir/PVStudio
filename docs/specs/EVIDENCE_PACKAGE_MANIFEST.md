@@ -41,8 +41,8 @@ Automated Test Runner: tests/test_750kw_cand_i_end_to_end.py & poetry run pytest
 ## 3. Test Coverage & Parameterization Audit
 
 ```
-Total Test Functions: 21
-Total Parametrized Assertions: 84
+Total Test Functions: 22 (21 Phase 2 baseline tests + 1 DC constraint guard test 'test_calc_sizing_dc_constraint_violation_guard_firing')
+Total Parametrized Assertions: 86
 Gate Coverage Mapping: 100% (G1 through G20 backed by substantive automated CI logic tests, with manual human sign-offs serving as additive submittability confirmation)
 ```
 
@@ -56,7 +56,7 @@ Gate Coverage Mapping: 100% (G1 through G20 backed by substantive automated CI l
 | `test_sprint3_cand_i_extensions.py` | 2 | 10 | G14, G15 |
 | `test_750kw_cand_i_end_to_end.py` | 1 | 12 | G15, G20 |
 | `test_benchmarks.py` | 2 | 8 | G2 |
-| `test_calc_sizing_dc.py` | 1 | 6 | G12 |
+| `test_calc_sizing_dc.py` | 2 | 8 | G12 (`test_calc_sizing_dc_constraint_violation_guard_firing` added) |
 | `test_sprint4_cand_i_deliverables.py` | 4 | 16 | G16, G17, G18 |
 
 ---
