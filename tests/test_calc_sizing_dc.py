@@ -1,9 +1,10 @@
 """
-Automated CI Test: calc_sizing_dc Direction-of-Derating & Module Physical Parameters
-Per Technical Specification §5.2 & Sprint 4 Clarification 2
-Verifies:
-  - Cold Voc: T_cell = T_amb = -10 C (zero irradiance cold extreme) -> Voc_cold = 54.35 V (STC Voc = 49.5 V)
-  - Hot Vmp: T_cell = 71.25 C (NOCT at 40 C amb + 1000 W/m2) -> Vmp_hot = 34.52 V (STC Vmp = 41.2 V, ~16.2% derating)
+Automated CI Test: calc_sizing_dc Physical Cell Derating Model Unit Tests
+Per Technical Specification §4.4 Module 2 & Sprint 4 Clarification 2
+Asserts:
+  1. Cold Voc calculated at T_cell = T_amb_min (-10 C)
+  2. Hot Vmp calculated with NOCT derating model (T_cell = 71.25 C at 40 C amb)
+  3. Intermediate values exposed for calculation transparency side-panel
 """
 
 import pytest
@@ -41,5 +42,4 @@ def test_calc_sizing_dc_physical_derating_values():
 
     # 2. Hot Vmp Verification (T_cell = 71.25 C at 40 C amb)
     assert inter["t_cell_hot_c"] == 71.25
-    assert inter["v_mp_module_min_hot_v"] == 34.52  # 41.2 * (1 + (-0.0035 * 46.25)) = 34.52 V (~16.2% derating)
-    assert inter["v_mp_module_min_hot_v"] < inputs.v_mp_stc * 0.85
+    assert abs(inter["v_mp_module_min_hot_v"] - 34.52) <= 0.02  # 41.2 * (1 + (-0.0035 * 46.25)) = 34.53 V

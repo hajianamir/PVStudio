@@ -7,7 +7,7 @@ Per Technical Specification §4.3 & Gate Criterion G2
 """
 
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 GOLDEN_METADATA = {
     "source_tool": "PVsyst 7.4.2",
@@ -118,7 +118,10 @@ CASE_SIMULATION_FACTORS = {
 }
 
 
-def run_benchmark_harness() -> Dict[str, Any]:
+def run_benchmark_harness(
+    mock_annual_factor: Optional[float] = None,
+    mock_monthly_factor: Optional[float] = None
+) -> Dict[str, Any]:
     results = []
     all_passed = True
 
@@ -151,10 +154,13 @@ def run_benchmark_harness() -> Dict[str, Any]:
             })
         else:
             factors = CASE_SIMULATION_FACTORS[cid]
-            sim_annual = case["reference_pvsyst_annual_kwh"] * factors["annual_factor"]
+            ann_factor = mock_annual_factor if mock_annual_factor is not None else factors["annual_factor"]
+            mon_factor = mock_monthly_factor if mock_monthly_factor is not None else factors["monthly_worst_factor"]
+
+            sim_annual = case["reference_pvsyst_annual_kwh"] * ann_factor
             annual_delta_percent = abs(sim_annual - case["reference_pvsyst_annual_kwh"]) / case["reference_pvsyst_annual_kwh"] * 100.0
 
-            worst_monthly = case["reference_pvsyst_monthly_kwh"][6] * factors["monthly_worst_factor"]
+            worst_monthly = case["reference_pvsyst_monthly_kwh"][6] * mon_factor
             worst_monthly_ref = case["reference_pvsyst_monthly_kwh"][6]
             max_monthly_delta_percent = abs(worst_monthly - worst_monthly_ref) / worst_monthly_ref * 100.0
 

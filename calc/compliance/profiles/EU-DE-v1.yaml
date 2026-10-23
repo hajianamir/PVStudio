@@ -1,4 +1,4 @@
-# Germany / EU Residential Compliance Profile
+# Germany / EU Residential & C&I Compliance Profile
 profile_id: "EU-DE-v1"
 market: "Germany / European Union"
 jurisdiction: "EU-DE"
@@ -13,6 +13,9 @@ dc_system:
 ac_interconnection:
   busbar_120_percent_rule_enabled: false
   feeder_125_percent_rule_enabled: false
+  # Note: 100 kW represents a conservative default planning ceiling below the VDE-AR-N 4105 ~135 kW boundary,
+  # above which VDE-AR-N 4110 medium-voltage connection rules apply.
+  lv_max_capacity_kw: 100.0
 
 tariff_defaults:
   currency_symbol: "€"
@@ -27,3 +30,5 @@ standards_citations:
   spd_standard: "IEC 61643-11 Class II"
   grounding_standard: "IEC 60364-5-54"
   lightning_standard: "IEC 62305-2 / 62305-3"
+  lv_grid_connection_standard: "VDE-AR-N 4105 (Anschlüsse am Niederspannungsnetz)"
+  mv_grid_connection_standard: "VDE-AR-N 4110 (Anschlüsse am Mittelspannungsnetz)"

@@ -53,11 +53,11 @@ def calculate_dc_sizing(inputs: DCSizingInput) -> CalculationResult:
     v_oc_string_max_site = max_modules_per_string * v_oc_mod_max_cold
     v_mppt_string_min_site = min_modules_per_string * v_mp_mod_min_hot
 
-    # String count calculation
-    selected_modules_per_string = min(max_modules_per_string, max(min_modules_per_string, 18))
-    string_count = math.ceil(inputs.total_modules_count / selected_modules_per_string)
+    # String count calculation with zero-guard
+    selected_modules_per_string = min(max_modules_per_string, max(min_modules_per_string, 18)) if max_modules_per_string > 0 else 0
+    string_count = math.ceil(inputs.total_modules_count / selected_modules_per_string) if selected_modules_per_string > 0 else 0
 
-    is_valid = max_modules_per_string >= min_modules_per_string and v_oc_string_max_site <= inputs.inverter_v_max_dc
+    is_valid = max_modules_per_string >= min_modules_per_string and max_modules_per_string > 0 and v_oc_string_max_site <= inputs.inverter_v_max_dc
 
     inputs_dict = inputs.model_dump()
     input_hash = compute_input_hash(inputs_dict)

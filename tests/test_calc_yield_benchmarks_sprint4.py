@@ -66,6 +66,8 @@ def test_calc_yield_benchmark_9_microinverters_architecture():
     case = BENCHMARK_CASES[8]  # Case 9 (5 kW microinverters)
     inputs = YieldInputSchema(
         capacity_kwp=case["inputs"]["capacity_kwp"],
+        pitch_deg=20.0,
+        azimuth_deg=180.0,
         architecture=case["inputs"]["architecture"]
     )
     result = calculate_yield_simulation(inputs)

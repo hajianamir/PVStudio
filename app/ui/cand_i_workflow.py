@@ -1,91 +1,56 @@
 """
-C&I Market Segment Distinct 9-Step Workflow Menu Tree Architecture
-Per Technical Specification §2.2, §7.1 & Sprint 2 Terminology Fix
+C&I Workflow Navigation & Step Definition Service
+Per Technical Specification §2.2 & Sprint 3 Scope
+Extends menu tree to 9 explicit steps including Step 9: Permit Package Generation.
 """
 
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 
 
-class WorkflowStep(BaseModel):
-    step_number: int
+class WorkflowStepItem(BaseModel):
+    step_index: int
     step_id: str
-    title: str
-    description: str
-    is_completed: bool = False
-    required_inputs: List[str]
+    label: str
+    required: bool = True
 
 
 class CommercialIndustrialWorkflowTree(BaseModel):
-    segment: str = "COMMERCIAL_INDUSTRIAL"
+    segment: str = Field(default="COMMERCIAL_INDUSTRIAL")
     total_steps: int = 9
-    workflow_steps: List[WorkflowStep] = [
-        WorkflowStep(
-            step_number=1,
-            step_id="site_geospatial",
-            title="1. Site & Geospatial Analysis",
-            description="Property boundary import, terrain contours, keep-out zones, roof/ground plane drawing.",
-            required_inputs=["boundary_polygon", "keepout_zones", "dem_raster"]
-        ),
-        WorkflowStep(
-            step_number=2,
-            step_id="3d_layout",
-            title="2. 3D Roof / Ground Array Layout",
-            description="Commercial row-spacing optimization, pitch/azimuth, cable tray routes, equipment pads.",
-            required_inputs=["row_spacing_m", "module_selection", "pad_locations"]
-        ),
-        WorkflowStep(
-            step_number=3,
-            step_id="string_inverter_config",
-            title="3. String & 3-Phase Inverter Configuration",
-            description="3-Phase string inverter sizing (50-250 kW), multi-MPPT allocation, string routing.",
-            required_inputs=["inverter_selection_3phase", "strings_per_mppt"]
-        ),
-        WorkflowStep(
-            step_number=4,
-            step_id="ac_collection_protection",
-            title="4. AC Collection & Protection Coordination",
-            description="LV/MV cable schedules, pad-mounted transformer sizing (0.8/33 kV), breaker coordination.",
-            required_inputs=["transformer_selection", "cable_schedule_ac", "breaker_ratings"]
-        ),
-        WorkflowStep(
-            step_number=5,
-            step_id="interconnection_analysis",
-            title="5. Interconnection Point Analysis (PCC)",
-            description="Short-circuit fault current (Ik''), MV feeder bay count auto-sizing, VDE/IEEE grid compliance.",
-            required_inputs=["pcc_voltage_kv", "grid_impedance_ohm"]
-        ),
-        WorkflowStep(
-            step_number=6,
-            step_id="civil_structural",
-            title="6. Civil, Structural & Foundation Sizing",
-            description="Wind uplift (Eurocode 1 / ASCE 7-16), pile embedment depth, access road grading.",
-            required_inputs=["wind_speed_m_s", "soil_skin_friction_kPa"]
-        ),
-        WorkflowStep(
-            step_number=7,
-            step_id="procurement_rfq",
-            title="7. Procurement & RFQ Management",
-            description="Verified BOQ generation, RFQ package export, supplier submission tracking.",
-            required_inputs=["boq_items", "supplier_list"]
-        ),
-        WorkflowStep(
-            step_number=8,
-            step_id="cand_i_financial_model",
-            title="8. C&I Financial Model & Cash Flows",
-            description="Demand-charge peak shaving, IRR, NPV, LCOE, degradation-adjusted 25-year cash flows.",
-            required_inputs=["retail_tou_tariff", "demand_charge_usd_kw"]
-        ),
-        WorkflowStep(
-            step_number=9,
-            step_id="cand_i_permit_package",
-            title="9. C&I Permit-Ready Package Export",
-            description="Export permit-ready Single-Line Diagram (SLD), site layout drawing, verified BOQ, and utility interconnection brief.",
-            required_inputs=["signed_compliance_profile", "drawing_stamps"]
-        )
-    ]
+    workflow_steps: List[WorkflowStepItem] = Field(default_factory=list)
+
+
+CAND_I_WORKFLOW_STEPS: List[Dict[str, Any]] = [
+    {"step_index": 1, "step_id": "site_geospatial", "label": "Site & Geospatial Capture", "required": True},
+    {"step_index": 2, "step_id": "cand_i_3d_layout", "label": "3D Roof/Ground Layout & Shading", "required": True},
+    {"step_index": 3, "step_id": "cand_i_string_inverter_config", "label": "String & Inverter Configuration", "required": True},
+    {"step_index": 4, "step_id": "ac_collection_protection", "label": "AC Collection & Protection Design", "required": True},
+    {"step_index": 5, "step_id": "interconnection_analysis", "label": "Interconnection Point Analysis", "required": True},
+    {"step_index": 6, "step_id": "cand_i_civil_structural", "label": "Civil & Structural Design", "required": True},
+    {"step_index": 7, "step_id": "procurement_rfq", "label": "Procurement & RFQ Tracking", "required": True},
+    {"step_index": 8, "step_id": "cand_i_financial_model", "label": "C&I Financial & Peak Shaving Model", "required": True},
+    {"step_index": 9, "step_id": "cand_i_permit_package", "label": "Permit Package & Engineering SLD Export", "required": True}
+]
+
+
+def get_cand_i_workflow_steps() -> List[Dict[str, Any]]:
+    return CAND_I_WORKFLOW_STEPS
 
 
 def get_cand_i_workflow_tree() -> CommercialIndustrialWorkflowTree:
-    """Returns the C&I distinct 9-step workflow object."""
-    return CommercialIndustrialWorkflowTree()
+    items = [WorkflowStepItem(**s) for s in CAND_I_WORKFLOW_STEPS]
+    return CommercialIndustrialWorkflowTree(workflow_steps=items)
+
+
+def validate_cand_i_step_completion(completed_step_ids: List[str]) -> Dict[str, Any]:
+    all_required = {step["step_id"] for step in CAND_I_WORKFLOW_STEPS if step["required"]}
+    completed_set = set(completed_step_ids)
+    missing = all_required - completed_set
+
+    return {
+        "is_ready_for_permit_export": len(missing) == 0 or (len(missing) == 1 and "cand_i_permit_package" in missing),
+        "total_steps": len(CAND_I_WORKFLOW_STEPS),
+        "completed_count": len(completed_set),
+        "missing_steps": list(missing)
+    }

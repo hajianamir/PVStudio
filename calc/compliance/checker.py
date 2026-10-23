@@ -101,8 +101,20 @@ def evaluate_design_compliance(
                     )
 
             # 4. Controlled ISO 3166-2 Jurisdiction License Matching
-            profile_prefix = profile.jurisdiction.split("-")[0]  # e.g. US or DE
-            if not pe_license_jurisdiction or pe_license_jurisdiction not in VALID_ISO_3166_2_JURISDICTIONS or profile_prefix not in pe_license_jurisdiction:
+            # Match jurisdiction prefix or exact sub-region match (e.g. EU-DE matches DE / DE-BY / DE-BE; US-NEC matches US-CA / US-NY / etc.)
+            profile_jur = profile.jurisdiction.upper()
+            profile_parts = profile_jur.split("-")
+
+            is_valid_jurisdiction = False
+            if pe_license_jurisdiction in VALID_ISO_3166_2_JURISDICTIONS:
+                if pe_license_jurisdiction == profile_jur:
+                    is_valid_jurisdiction = True
+                elif any(part in pe_license_jurisdiction for part in profile_parts):
+                    is_valid_jurisdiction = True
+                elif any(pe_part in profile_jur for pe_part in pe_license_jurisdiction.split("-")):
+                    is_valid_jurisdiction = True
+
+            if not pe_license_jurisdiction or not is_valid_jurisdiction:
                 return ComplianceCheckResult(
                     is_approved=False,
                     status_code="REFUSAL_NO_PE_IN_JURISDICTION",
