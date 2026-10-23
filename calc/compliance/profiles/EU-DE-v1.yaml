@@ -16,6 +16,7 @@ ac_interconnection:
   # Note: 100 kW represents a conservative default planning ceiling below the VDE-AR-N 4105 ~135 kW boundary,
   # above which VDE-AR-N 4110 medium-voltage connection rules apply.
   lv_max_capacity_kw: 100.0
+  mv_nominal_voltage_kv: 30.0  # Standard VDE-AR-N 4110 30kV German medium-voltage grid class
 
 tariff_defaults:
   currency_symbol: "€"

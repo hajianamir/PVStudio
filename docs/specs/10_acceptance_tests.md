@@ -1,4 +1,4 @@
-# 10: Acceptance Test Catalogue (BDD Specifications)
+# 10: Acceptance Test Catalogue & Phase Gate Criteria (BDD Specifications)
 
 | Version | Status | Last Updated | Owner |
 | :--- | :--- | :--- | :--- |
@@ -99,13 +99,32 @@ Feature: Bankability Yield Engine (P50/P75/P90)
 
 ---
 
-## 10.3 Acceptance Gate Evidence Templates (B6)
+## 10.3 Phase 2 Gate Criteria (G11–G20)
+
+For Phase 2 (C&I Expansion & Procurement), the engineering team must satisfy all 10 acceptance gate criteria (G11–G20):
+
+| Gate ID | Gate Name | Verification Criteria / Threshold | Primary Artifact |
+| :--- | :--- | :--- | :--- |
+| **G11** | **C&I 9-Step Menu Tree** | Distinct 9-step C&I menu tree loaded upon selecting C&I segment. | `app/ui/cand_i_workflow.py` |
+| **G12** | **LV/MV Voltage Class Selection** | Profile-driven voltage selection (250 kW US ceiling, 100 kW EU ceiling; 30.0 kV EU-DE MV grid). | `calc_grid_interconnection` |
+| **G13** | **Substation Bay Breakdown** | Automatic component bay breakdown ($N_{total} = N_{incomer} + N_{transformer} + N_{metering} + N_{spare}$). | `calc_grid_interconnection` |
+| **G14** | **MV Protection & Relay Sizing** | MV switchgear circuit breaker, CT ratio, and ANSI 50/51/51N numerical relay functions. | `calc_protection` |
+| **G15** | **IEC 60909 Fault Current** | Short-circuit current $I_k''$ calculated per IEC 60909 with $0.5\text{--}30\text{ kA}$ sanity range check. | `calc_grid_interconnection` |
+| **G16** | **Civil Pad & Trench Design** | Pad dimensions, concrete volume, wind overturning $S.F. \ge 1.5$, and trench burial depth. | `calc_civil` |
+| **G17** | **Procurement & RFQ Module** | Line-item BOQ export with unit and extended pricing, total CAPEX, and text-layer RFQ. | `app/services/rfq_service.py` |
+| **G18** | **Dual Proposal Booklet** | Distinct Client Executive Proposal and AHJ Permit Package export sections. | `app/services/cand_i_proposal_generator.py` |
+| **G19** | **2-Stage PE Governance** | Audited override workflow (`proposer != approver_pe`, active status, ISO 3166-2 match). | `calc/compliance/checker.py` |
+| **G20** | **750 kW End-to-End Export** | Complete 750 kW C&I design run producing vector SVG SLD, BOQ, and interconnection brief. | `tests/test_750kw_cand_i_end_to_end.py` |
+
+---
+
+## 10.4 Acceptance Gate Evidence Templates (B6)
 
 To pass each phase acceptance gate, the engineering team must submit the corresponding formal evidence package:
 
 | Phase Gate | Evidence Artifact Required | Validation Threshold / Criterion |
 | :--- | :--- | :--- |
 | **Phase 1 Gate** | Benchmark Comparison Report | 10 reference cases executed against PVsyst/SAM with relative yield error $\le 1.5\%$. |
-| **Phase 2 Gate** | C&I Permit Package Audit | Permit-ready SLD, three-line diagram, and complete BOM generated for a 1 MW plant. |
+| **Phase 2 Gate** | C&I Permit Package Audit | Permit-ready SLD, three-line diagram, and complete BOM generated for a 1 MW plant (G11–G20). |
 | **Phase 3 Gate** | Bankability Audit Booklet | End-to-end Utility-Scale plant output containing Monte Carlo P50/P75/P90 and DSCR model. |
 | **Phase 4 Gate** | AI Copilot Error Suite Audit | AI Copilot detects $\ge 80\%$ of 50 intentionally introduced design errors with exact standard citations. |

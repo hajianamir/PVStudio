@@ -2,12 +2,13 @@
 calc_grid_interconnection: C&I Interconnection Point Analysis, Substation Bay Sizing & Short-Circuit Fault Current
 Per Technical Specification §4.4 Module 8 & Phase 2 Sprint 4 Refinements
 Refactored:
-  1. Short-Circuit Fault Current calculation per IEC 60909 / IEEE 141 using utility short-circuit capacity (Sk'' MVA)
+  1. EU-DE profile MV nominal voltage set to 30.0 kV (standard VDE-AR-N 4110 German medium-voltage distribution class).
+  2. Short-Circuit Fault Current calculation per IEC 60909 / IEEE 141 using utility short-circuit capacity (Sk'' MVA)
      and IEC 60909 max voltage factor c = 1.10:
      Ik'' = (c * Sk'') / (sqrt(3) * Un)
-     For EU-DE 33 kV grid with default Sk'' = 500 MVA:
-     Ik'' = (1.10 * 500 MVA) / (sqrt(3) * 33 kV) = 550 MVA / 57.158 kV = 9.62 kA.
-  2. Includes explicit FaultCurrentOutOfRange warning diagnostic if Ik'' < 0.5 kA or > 30 kA for MV connections.
+     For EU-DE 30 kV grid with default Sk'' = 500 MVA:
+     Ik'' = (1.10 * 500 MVA) / (sqrt(3) * 30 kV) = 550 MVA / 51.9615 kV = 10.58 kA.
+  3. Includes explicit FaultCurrentOutOfRange warning diagnostic if Ik'' < 0.5 kA or > 30 kA for MV connections.
 """
 
 import math
@@ -29,8 +30,8 @@ PROFILE_INTERCONNECTION_CONFIGS = {
     "EU-DE-v1": {
         "lv_max_capacity_kw": 100.0,
         "lv_nominal_voltage_kv": 0.40,  # 400V 3-phase LV
-        "mv_nominal_voltage_kv": 33.0,  # 33 kV EU MV distribution grid
-        "default_grid_sk_mva": 500.0,   # 500 MVA 33kV utility network short-circuit capacity
+        "mv_nominal_voltage_kv": 30.0,  # 30.0 kV EU-DE MV distribution grid per VDE-AR-N 4110
+        "default_grid_sk_mva": 500.0,   # 500 MVA 30kV utility network short-circuit capacity
         "interconnection_standard": "VDE-AR-N 4110 (MV) / VDE-AR-N 4120 (HV) / EN 50549-2",
         "short_circuit_methodology_standard": "IEC 60909 (Short-Circuit Calculation) / IEC 60947"
     }

@@ -3,7 +3,7 @@ Automated CI Test: calc_grid_interconnection Profile-Driven Symmetric LV vs MV S
 Per Technical Specification §4.4 Module 8 & Sprint 2 Action Item 1 Fix
 Asserts:
   1. US-NEC-2020-v1: 80 kW -> LV_0.48kV, 200 kW -> LV_0.48kV (<250kW ceiling), 750 kW -> MV_13.8kV
-  2. EU-DE-v1: 80 kW -> LV_0.4kV, 200 kW -> MV_33kV (>100kW ceiling per VDE-AR-N 4105), 750 kW -> MV_33kV
+  2. EU-DE-v1: 80 kW -> LV_0.4kV, 200 kW -> MV_30.0kV (>100kW ceiling per VDE-AR-N 4105), 750 kW -> MV_30.0kV
 """
 
 import pytest
@@ -37,17 +37,18 @@ def test_eu_profile_voltage_selection_matrix():
     assert res_80.outputs["voltage_class"] == "LV_0.4kV"
     assert res_80.outputs["recommended_voltage_kv"] == 0.4
 
-    # 200 kW EU-DE -> MV_33kV (ABOVE 100 kW EU ceiling per VDE-AR-N 4105/4110)
+    # 200 kW EU-DE -> MV_30.0kV (ABOVE 100 kW EU ceiling per VDE-AR-N 4105/4110)
     res_200 = calculate_grid_interconnection(InterconnectionInput(plant_capacity_kw=200.0, profile_id="EU-DE-v1"))
     assert res_200.outputs["is_lv_connection"] is False
-    assert res_200.outputs["voltage_class"] == "MV_33.0kV"
-    assert res_200.outputs["recommended_voltage_kv"] == 33.0
+    assert res_200.outputs["voltage_class"] == "MV_30.0kV"
+    assert res_200.outputs["recommended_voltage_kv"] == 30.0
     assert res_200.outputs["total_substation_bays"] == 4
 
-    # 750 kW EU-DE -> MV_33kV
+    # 750 kW EU-DE -> MV_30.0kV
     res_750 = calculate_grid_interconnection(InterconnectionInput(plant_capacity_kw=750.0, profile_id="EU-DE-v1"))
     assert res_750.outputs["is_lv_connection"] is False
-    assert res_750.outputs["voltage_class"] == "MV_33.0kV"
+    assert res_750.outputs["voltage_class"] == "MV_30.0kV"
+    assert res_750.outputs["short_circuit_fault_current_ka"] == 10.58
 
 
 def test_calc_grid_interconnection_multi_incomer_synthetic_plant():
@@ -61,6 +62,6 @@ def test_calc_grid_interconnection_multi_incomer_synthetic_plant():
     outputs = result.outputs
     breakdown = outputs["bay_breakdown"]
 
-    assert outputs["recommended_voltage_kv"] == 33.0
+    assert outputs["recommended_voltage_kv"] == 30.0
     assert breakdown["incomer_bays"] == 2
     assert outputs["total_substation_bays"] == 5

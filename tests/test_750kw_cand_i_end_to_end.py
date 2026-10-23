@@ -5,7 +5,7 @@ Executes complete 750 kW C&I design across all 9 steps:
   Step 2: 3D Layout & Array Layout
   Step 3: String/Inverter Configuration (7x 110kW / 100kW Inverters)
   Step 4: AC Collection & Protection Design (MV Cable & Numerical Relay)
-  Step 5: Grid Interconnection Analysis (33 kV Substation & Short-Circuit Fault Current)
+  Step 5: Grid Interconnection Analysis (30 kV Substation & Short-Circuit Fault Current)
   Step 6: Civil / Structural Pads
   Step 7: Procurement BOQ
   Step 8: C&I Financial LCOE/NPV
@@ -34,7 +34,7 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
     # 2. Step 4: AC Collection Cable & Transformer Sizing
     ac_input = ACElectricalInput(
         p_ac_kw=750.0,
-        v_ac_nominal_v=33.0,
+        v_ac_nominal_v=30.0,
         cable_length_m=200.0,
         phases=3,
         power_factor=0.95,
@@ -42,13 +42,13 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
         profile_id="EU-DE-v1"
     )
     ac_res = calculate_ac_electrical(ac_input)
-    assert ac_res.outputs["i_ac_nominal_a"] == 13.81
+    assert ac_res.outputs["i_ac_nominal_a"] == 15.19
     assert ac_res.outputs["selected_cable_mm2"] == 70.0
     assert ac_res.outputs["transformer_kva_recommended"] == 800.0
 
     # 3. Step 4: MV Protection & Numerical Relay
     prot_input = ProtectionInput(
-        i_ac_nominal_a=13.81,
+        i_ac_nominal_a=15.19,
         voltage_class="MV",
         profile_id="EU-DE-v1"
     )
@@ -56,7 +56,7 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
     assert prot_res.outputs["recommended_ac_breaker_a"] == 630
     assert prot_res.outputs["recommended_ct_ratio"] == "50/5A"
 
-    # 4. Step 5: Grid Interconnection Analysis & Substation Bays (500 MVA Sk'' -> 9.62 kA)
+    # 4. Step 5: Grid Interconnection Analysis & Substation Bays (500 MVA Sk'' -> 10.58 kA @ 30kV)
     grid_input = InterconnectionInput(
         plant_capacity_kw=750.0,
         bay_max_ampacity_a=630.0,
@@ -64,9 +64,9 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
     )
     grid_res = calculate_grid_interconnection(grid_input)
     assert grid_res.outputs["is_lv_connection"] is False
-    assert grid_res.outputs["voltage_class"] == "MV_33.0kV"
+    assert grid_res.outputs["voltage_class"] == "MV_30.0kV"
     assert grid_res.outputs["total_substation_bays"] == 4
-    assert grid_res.outputs["short_circuit_fault_current_ka"] == 9.62
+    assert grid_res.outputs["short_circuit_fault_current_ka"] == 10.58
     assert grid_res.outputs["fault_current_warning"] is None
 
     # 5. Step 8: Financial Model (LCOE & Payback)
@@ -86,10 +86,10 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
         project_name="Apex Logistics Center 750kW Rooftop PV",
         plant_capacity_kw=750.0,
         profile_id="EU-DE-v1",
-        voltage_class="MV_33.0kV",
+        voltage_class="MV_30.0kV",
         inverter_model="Huawei SUN2000-100KTL-M2",
         inverter_count=7,
-        transformer_model="Schneider Trihal 1000kVA 0.8/33kV",
+        transformer_model="Schneider Trihal 1000kVA 0.8/30kV",
         switchgear_model="ABB SafeRing 36kV 630A CCV Ring Main Unit"
     )
     pkg_res = PermitPackageGeneratorService.generate_permit_package(pkg_input)
@@ -103,7 +103,7 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
     assert svg.count("<line") >= 4          # Interconnect bus lines
     assert "SINGLE-LINE DIAGRAM (SLD)" in svg
     assert "750.0 kW AC" in svg
-    assert "MV_33.0kV" in svg
+    assert "MV_30.0kV" in svg
     assert "LV/MV Transformer" in svg
     assert "MV SWITCHGEAR" in svg
     assert len(pkg_res.boq_export) == 6

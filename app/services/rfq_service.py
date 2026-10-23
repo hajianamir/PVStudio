@@ -14,7 +14,7 @@ class RFQRequestInput(BaseModel):
     plant_capacity_kw: float = Field(..., gt=0)
     inverter_model: str = Field(default="Huawei SUN2000-100KTL-M2")
     inverter_count: int = Field(default=7)
-    transformer_model: str = Field(default="Schneider Trihal 1000kVA 0.8/33kV")
+    transformer_model: str = Field(default="Schneider Trihal 1000kVA 0.8/30kV")
     switchgear_model: str = Field(default="ABB SafeRing 36kV 630A CCV Ring Main Unit")
     currency_symbol: str = Field(default="€")
 
@@ -40,8 +40,8 @@ class ProcurementRFQService:
                 "description": "Jinko / Trina 405W TOPCon N-type Monocrystalline PV Modules",
                 "quantity": module_qty,
                 "unit": "PCS",
-                "estimated_unit_cost": 85.0,
-                "estimated_total_cost": round(module_qty * 85.0, 2)
+                "unit_cost_usd": 85.0,
+                "extended_cost_usd": round(module_qty * 85.0, 2)
             },
             {
                 "line_no": 2,
@@ -49,8 +49,8 @@ class ProcurementRFQService:
                 "description": f"Three-Phase String Inverters ({inputs.inverter_model})",
                 "quantity": inputs.inverter_count,
                 "unit": "UNITS",
-                "estimated_unit_cost": 4200.0,
-                "estimated_total_cost": round(inputs.inverter_count * 4200.0, 2)
+                "unit_cost_usd": 4200.0,
+                "extended_cost_usd": round(inputs.inverter_count * 4200.0, 2)
             },
             {
                 "line_no": 3,
@@ -58,8 +58,8 @@ class ProcurementRFQService:
                 "description": f"LV/MV Step-Up Transformer ({inputs.transformer_model})",
                 "quantity": 1,
                 "unit": "UNIT",
-                "estimated_unit_cost": 28000.0,
-                "estimated_total_cost": 28000.0
+                "unit_cost_usd": 28000.0,
+                "extended_cost_usd": 28000.0
             },
             {
                 "line_no": 4,
@@ -67,17 +67,17 @@ class ProcurementRFQService:
                 "description": f"MV Switchgear Ring Main Unit ({inputs.switchgear_model})",
                 "quantity": 1,
                 "unit": "UNIT",
-                "estimated_unit_cost": 18500.0,
-                "estimated_total_cost": 18500.0
+                "unit_cost_usd": 18500.0,
+                "extended_cost_usd": 18500.0
             },
             {
                 "line_no": 5,
                 "category": "CABLES_CONTAINMENT",
-                "description": "33kV XLPE 3-Core MV AC Collection Cable & Cable Trays",
+                "description": "30kV XLPE 3-Core MV AC Collection Cable & Cable Trays",
                 "quantity": 250,
                 "unit": "METERS",
-                "estimated_unit_cost": 45.0,
-                "estimated_total_cost": 11250.0
+                "unit_cost_usd": 45.0,
+                "extended_cost_usd": 11250.0
             },
             {
                 "line_no": 6,
@@ -85,12 +85,12 @@ class ProcurementRFQService:
                 "description": "Substation Pad, Foundation Concrete, and Grounding Mesh",
                 "quantity": 1,
                 "unit": "LOT",
-                "estimated_unit_cost": 14500.0,
-                "estimated_total_cost": 14500.0
+                "unit_cost_usd": 14500.0,
+                "extended_cost_usd": 14500.0
             }
         ]
 
-        total_capex = sum(item["estimated_total_cost"] for item in bom_line_items)
+        total_capex = sum(item["extended_cost_usd"] for item in bom_line_items)
 
         rfq_text = f"""REQUEST FOR QUOTATION (RFQ) — C&I SOLAR EQUIPMENT
 Project Name: {inputs.project_name} (ID: {inputs.project_id})
@@ -98,10 +98,10 @@ Plant Capacity: {inputs.plant_capacity_kw:.1f} kW AC
 Generated via PVStudio Procurement Engine
 
 EQUIPMENT SPECIFICATION SUMMARY:
-- PV Modules: {module_qty}x 405W TOPCon N-type
-- Inverters: {inputs.inverter_count}x {inputs.inverter_model}
-- Step-Up Transformer: 1x {inputs.transformer_model}
-- MV Switchgear: 1x {inputs.switchgear_model}
+- PV Modules: {module_qty}x 405W TOPCon N-type @ {inputs.currency_symbol}85.00/pc = {inputs.currency_symbol}{module_qty * 85.0:,.2f}
+- Inverters: {inputs.inverter_count}x {inputs.inverter_model} @ {inputs.currency_symbol}4,200.00/unit = {inputs.currency_symbol}{inputs.inverter_count * 4200.0:,.2f}
+- Step-Up Transformer: 1x {inputs.transformer_model} @ {inputs.currency_symbol}28,000.00
+- MV Switchgear: 1x {inputs.switchgear_model} @ {inputs.currency_symbol}18,500.00
 
 TOTAL ESTIMATED CAPEX: {inputs.currency_symbol}{total_capex:,.2f}
 

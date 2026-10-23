@@ -3,6 +3,7 @@ calc_civil: C&I Substation Pad, Civil Foundation & Cable Trench Engineering Pack
 Per Technical Specification §4.4 Module 6 & Sprint 4 Scope
 Calculates transformer pad dimensions, concrete volume, wind overturning moments (ASCE 7-16 / Eurocode 1),
 soil bearing capacity checks, and cable trench burial depths per NEC 300.5 / IEC 60364-5-52.
+Supports explicit geotech and site-specific wind data verification flags.
 """
 
 import math
@@ -17,7 +18,9 @@ class CivilInputSchema(BaseModel):
     equipment_width_m: float = Field(default=1.8, gt=0, description="Equipment width [m]")
     equipment_length_m: float = Field(default=2.5, gt=0, description="Equipment length [m]")
     basic_wind_speed_m_s: float = Field(default=35.0, gt=0, description="3-second gust basic wind speed [m/s]")
+    is_wind_speed_assumed: bool = Field(default=True, description="True if regional default wind speed used")
     allowable_soil_bearing_capacity_kpa: float = Field(default=150.0, gt=0, description="Allowable soil bearing pressure [kPa]")
+    is_soil_bearing_assumed: bool = Field(default=True, description="True if regional default soil bearing pressure used")
     profile_id: str = Field(default="US-NEC-2020-v1")
 
 
@@ -97,6 +100,8 @@ def calculate_civil_foundations(inputs: CivilInputSchema) -> CalculationResult:
         "applied_soil_pressure_kpa": round(applied_soil_pressure_kpa, 2),
         "is_bearing_capacity_compliant": bearing_capacity_compliant,
         "is_overturning_safe": overturning_safety_factor >= 1.5,
+        "requires_geotech_verification": inputs.is_soil_bearing_assumed,
+        "requires_site_specific_wind_data": inputs.is_wind_speed_assumed,
         "cable_trench_recommendations": {
             "depth_m": recommended_trench_depth_m,
             "width_m": recommended_trench_width_m,
