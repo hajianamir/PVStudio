@@ -12,6 +12,7 @@ from calc.calc_sizing_dc.service import DCSizingInput, calculate_dc_sizing
 
 
 def test_calc_sizing_dc_physical_derating_values():
+    # Standard STC module input
     inputs = DCSizingInput(
         v_oc_stc=49.5,
         v_mp_stc=41.2,
@@ -43,3 +44,13 @@ def test_calc_sizing_dc_physical_derating_values():
     # 2. Hot Vmp Verification (T_cell = 71.25 C at 40 C amb)
     assert inter["t_cell_hot_c"] == 71.25
     assert abs(inter["v_mp_module_min_hot_v"] - 34.52) <= 0.02  # 41.2 * (1 + (-0.0035 * 46.25)) = 34.53 V
+
+
+def test_calc_sizing_dc_constraint_violation_guard_firing():
+    # Synthetic module with 1100V Voc_stc to force cold-Voc over-voltage for constraint guard testing
+    synthetic_input = DCSizingInput(v_oc_stc=1100.0, raise_on_violation=False)
+    res = calculate_dc_sizing(synthetic_input)
+
+    assert res.outputs["is_compliant"] is False
+    assert res.outputs["violation_reasons"] is not None
+    assert "Cold module Voc (1207.80V) exceeds inverter max DC voltage" in res.outputs["violation_reasons"][0]

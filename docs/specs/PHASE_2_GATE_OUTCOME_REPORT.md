@@ -5,7 +5,7 @@ Phase: Phase 2 — Commercial & Industrial (C&I) Expansion & Procurement
 Master Specification Version: 1.0.0
 Git Tag Baseline: phase-2-gate-passed
 Evidence Package Freeze Tag: v1.0.0-phase2-freeze
-Evidence Package SHA-256 Checksum: a5f12265cc411688b614626c6672e4c95e07aaf96e11f54d2dc3ec2e4f86e99d
+Final Evidence Package SHA-256 Checksum: a8384749dc26953a91e90ff2978fe21fc55687c5c50248a19c78098fdb1f10a2
 Review Date: Phase 2 Sprint 5 Week 4 Day 5
 Gate Outcome: ALL 10 PHASE 2 GATES (G11–G20) PASSED — PHASE 2 FORMALLY CLOSED
 Phase 3 Status: PHASE 3 UNCONDITIONALLY OPEN FOR UTILITY-SCALE KICKOFF
@@ -34,6 +34,19 @@ Phase 3 Status: PHASE 3 UNCONDITIONALLY OPEN FOR UTILITY-SCALE KICKOFF
 
 ---
 
-## 2. Phase 2 Formal Closure Declaration
+## 2. Manifest Freeze Iteration Record
+
+The `EVIDENCE_PACKAGE_MANIFEST.md` artifact progressed through three content states during the Phase 2 gate review window, each iteration documented for full cryptographic provenance:
+
+- **State 1 (`5ac48b62...`):** Initial freeze submission. Sign-off dates in body carried placeholder Phase 1 dates (`2025-02-18`).
+- **State 2 (`a5f12265...`):** Header timestamp updated. Sign-off dates in body retained placeholder dates — flagged during pre-gate audit.
+- **State 3 (`a8384749...`):** Sign-off dates updated to Phase 2 Sprint 5 Week 3 review timestamp (`2026-10-23`). Verified: `grep "2025-02-18"` returned `0 HITS FOUND`.
+
+**Final Frozen State:** `a8384749dc26953a91e90ff2978fe21fc55687c5c50248a19c78098fdb1f10a2`
+Git tag `phase-2-gate-passed` points directly to the commit containing State 3.
+
+---
+
+## 3. Phase 2 Formal Closure Declaration
 
 The Lead Specification Owner and Co-Owners hereby declare **Phase 2 (C&I Expansion & Procurement) FORMALLY CLOSED**. Git tag `phase-2-gate-passed` has been applied to main. Phase 3 (Utility-Scale & Grid Interconnection, $>1\text{ MW}$) is unconditionally open for kickoff.
