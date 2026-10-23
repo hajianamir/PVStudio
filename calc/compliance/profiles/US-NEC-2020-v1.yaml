@@ -17,7 +17,8 @@ ac_interconnection:
   feeder_125_percent_rule_enabled: true
   lv_max_capacity_kw: 250.0
   mv_nominal_voltage_kv: 13.8
-  hv_voltage_levels_kv: [115.0, 230.0]  # US HV grid transmission levels
+  hv_voltage_levels_kv: [115.0, 138.0, 230.0, 345.0, 500.0]  # Full US HV transmission grid levels
+  min_required_dscr: 1.20      # Profile-driven bankable DSCR threshold
 
 tariff_defaults:
   currency_symbol: "$"
