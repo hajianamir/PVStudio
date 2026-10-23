@@ -99,22 +99,22 @@ Feature: Bankability Yield Engine (P50/P75/P90)
 
 ---
 
-## 10.3 Phase 2 Gate Criteria (G11–G20)
+## 10.3 Phase 2 Acceptance Gate Criteria (G11–G20 Specification Table)
 
 For Phase 2 (C&I Expansion & Procurement), the engineering team must satisfy all 10 acceptance gate criteria (G11–G20):
 
-| Gate ID | Gate Name | Verification Criteria / Threshold | Primary Artifact |
-| :--- | :--- | :--- | :--- |
-| **G11** | **C&I 9-Step Menu Tree** | Distinct 9-step C&I menu tree loaded upon selecting C&I segment. | `app/ui/cand_i_workflow.py` |
-| **G12** | **LV/MV Voltage Class Selection** | Profile-driven voltage selection (250 kW US ceiling, 100 kW EU ceiling; 30.0 kV EU-DE MV grid). | `calc_grid_interconnection` |
-| **G13** | **Substation Bay Breakdown** | Automatic component bay breakdown ($N_{total} = N_{incomer} + N_{transformer} + N_{metering} + N_{spare}$). | `calc_grid_interconnection` |
-| **G14** | **MV Protection & Relay Sizing** | MV switchgear circuit breaker, CT ratio, and ANSI 50/51/51N numerical relay functions. | `calc_protection` |
-| **G15** | **IEC 60909 Fault Current** | Short-circuit current $I_k''$ calculated per IEC 60909 with $0.5\text{--}30\text{ kA}$ sanity range check. | `calc_grid_interconnection` |
-| **G16** | **Civil Pad & Trench Design** | Pad dimensions, concrete volume, wind overturning $S.F. \ge 1.5$, and trench burial depth. | `calc_civil` |
-| **G17** | **Procurement & RFQ Module** | Line-item BOQ export with unit and extended pricing, total CAPEX, and text-layer RFQ. | `app/services/rfq_service.py` |
-| **G18** | **Dual Proposal Booklet** | Distinct Client Executive Proposal and AHJ Permit Package export sections. | `app/services/cand_i_proposal_generator.py` |
-| **G19** | **2-Stage PE Governance** | Audited override workflow (`proposer != approver_pe`, active status, ISO 3166-2 match). | `calc/compliance/checker.py` |
-| **G20** | **750 kW End-to-End Export** | Complete 750 kW C&I design run producing vector SVG SLD, BOQ, and interconnection brief. | `tests/test_750kw_cand_i_end_to_end.py` |
+| Gate ID | Gate Title | Assertion Statement (What Must Be True) | Evidence Artifact Source | Verification Mode |
+| :--- | :--- | :--- | :--- | :--- |
+| **G11** | **C&I 9-Step Menu Tree** | Selecting the C&I segment dynamically loads a distinct 9-step workflow tree ending in Step 9 Permit Package. | `app/ui/cand_i_workflow.py` / `test_cand_i_workflow.py` | Automated CI |
+| **G12** | **Symmetric LV/MV Voltage Selection** | Voltage selection uses profile-driven ceilings (250 kW US, 100 kW EU) and profile MV nominal voltages (13.8 kV US, 30.0 kV EU-DE per VDE-AR-N 4110). | `calc_grid_interconnection` / `test_calc_grid_interconnection.py` | Automated CI |
+| **G13** | **Substation Bay Breakdown** | MV connections automatically decompose into incomer, transformer, metering, and spare substation bays ($N_{total} = N_{inc} + N_{trafo} + N_{met} + N_{spare}$). | `calc_grid_interconnection` / `test_calc_grid_interconnection.py` | Automated CI |
+| **G14** | **MV Protection & Relay Coordination** | MV switchgear circuit breakers, CT primary ratios, and ANSI 50/51/51N numerical relay functions are sized per IEEE C37.2 / IEC 60255. | `calc_protection` / `test_sprint3_cand_i_extensions.py` | Automated CI |
+| **G15** | **IEC 60909 Short-Circuit Fault Current** | Short-circuit current $I_k''$ is calculated per IEC 60909 with max voltage factor $c=1.10$ and bounded by $0.5\text{--}30\text{ kA}$ sanity range warnings. | `calc_grid_interconnection` / `test_750kw_cand_i_end_to_end.py` | Automated CI |
+| **G16** | **Civil Foundation & Cable Trench Sizing** | Transformer pad dimensions, concrete volume, wind overturning safety factor ($S.F. \ge 1.5$), and trench depth are calculated with geotech/wind flags. | `calc_civil` / `test_sprint4_cand_i_deliverables.py` | Automated CI |
+| **G17** | **Procurement BOQ & RFQ Generator** | Line-item BOQ export contains explicit unit pricing, extended pricing, category rollups, and text-layer RFQ document generation. | `app/services/rfq_service.py` / `test_sprint4_cand_i_deliverables.py` | Automated CI |
+| **G18** | **Dual Proposal Booklet Generator** | Proposal engine renders distinct Client Executive Proposal and AHJ Permit Package sections with visible diagnostic warning banners. | `app/services/cand_i_proposal_generator.py` / `test_sprint4_cand_i_deliverables.py` | Automated CI |
+| **G19** | **2-Stage PE Override Governance** | Design overrides require two distinct users (`proposer != approver_pe`), active status, license expiry checks, and ISO 3166-2 jurisdiction code matching. | `calc/compliance/checker.py` / `test_compliance_refusal.py` | Automated CI |
+| **G20** | **750 kW End-to-End Permit Export** | Complete 750 kW C&I design run passes all 9 steps, Phase 1 regressions, and produces a vector SVG SLD diagram with equipment node assertions. | `tests/test_750kw_cand_i_end_to_end.py` | Automated CI & Manual Audit |
 
 ---
 

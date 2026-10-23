@@ -3,7 +3,7 @@ Automated CI Integration Tests for Phase 2 Sprint 4 Core Deliverables
 Per Technical Specification §4.4 & Sprint 4 Scope
 Asserts:
   - calc_civil pad dimensions, concrete volume, overturning safety factor (>= 1.5), and trench depths
-  - ProcurementRFQService BOQ line items and RFQ document generation
+  - ProcurementRFQService BOQ line items, unit pricing sources, and RFQ document generation
   - CandIProposalGeneratorService distinct Client Executive Proposal and AHJ Permit Package sections
 """
 
@@ -11,6 +11,7 @@ import pytest
 from calc.calc_civil.service import CivilInputSchema, calculate_civil_foundations
 from app.services.rfq_service import ProcurementRFQService, RFQRequestInput
 from app.services.cand_i_proposal_generator import CandIProposalGeneratorService, CandIProposalInput
+from app.services.permit_package_generator import PermitPackageGeneratorService, PermitPackageInput
 
 
 def test_calc_civil_foundation_and_trench_sizing():
@@ -33,6 +34,8 @@ def test_calc_civil_foundation_and_trench_sizing():
     assert outputs["is_overturning_safe"] is True
     assert outputs["overturning_safety_factor"] >= 1.5
     assert outputs["is_bearing_capacity_compliant"] is True
+    assert outputs["requires_geotech_verification"] is True
+    assert outputs["requires_site_specific_wind_data"] is True
     assert outputs["cable_trench_recommendations"]["depth_m"] == 1.0
     assert "Eurocode 1" in result.provenance.standards_referenced[0]
 
@@ -50,9 +53,38 @@ def test_procurement_rfq_service_generation():
 
     assert res.project_id == "PRJ_CAND_I_750KW_001"
     assert len(res.bom_line_items) == 6
-    assert res.total_estimated_capex > 200000.0
+
+    # Assert explicit line-item equipment quantities & exact extended cost math:
+    # 1852 * 85 = 157420; 7 * 4200 = 29400; Trafo = 28000; Switchgear = 18500; Cable = 11250; Civil = 14500
+    # Sum = 157420 + 29400 + 28000 + 18500 + 11250 + 14500 = 259070.0
+    modules_item = next(item for item in res.bom_line_items if item["category"] == "PV_MODULES")
+    assert modules_item["quantity"] == 1852
+    assert modules_item["unit_cost_usd"] == 85.0
+    assert modules_item["extended_cost_usd"] == 157420.0
+
+    inverters_item = next(item for item in res.bom_line_items if item["category"] == "INVERTERS")
+    assert inverters_item["quantity"] == 7
+    assert inverters_item["unit_cost_usd"] == 4200.0
+
+    assert res.total_estimated_capex == 259070.0
     assert "REQUEST FOR QUOTATION (RFQ)" in res.rfq_document_text
     assert "Apex Logistics Center" in res.rfq_document_text
+
+
+def test_permit_package_visible_diagnostic_warnings():
+    pkg_input = PermitPackageInput(
+        project_id="PRJ_CAND_I_750KW_001",
+        project_name="Apex Logistics Center 750kW Rooftop PV",
+        plant_capacity_kw=750.0,
+        profile_id="EU-DE-v1",
+        voltage_class="MV_30.0kV",
+        requires_geotech_verification=True,
+        requires_site_specific_wind_data=True
+    )
+    res = PermitPackageGeneratorService.generate_permit_package(pkg_input)
+
+    assert "GEOTECHNICAL SOIL BEARING VERIFICATION REQUIRED" in res.rendered_sld_svg
+    assert "FOUNDATION DESIGN ASSUMES 150 kPa BEARING CAPACITY" in res.interconnection_brief["visible_warning_notices"][0]
 
 
 def test_cand_i_proposal_booklet_dual_section_generation():
