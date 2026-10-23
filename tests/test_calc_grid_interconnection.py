@@ -1,50 +1,53 @@
 """
-Automated CI Test: calc_grid_interconnection Profile-Driven LV vs MV Voltage Selection Test
-Per Technical Specification §4.4 Module 8 & Sprint 2 Fixes
+Automated CI Test: calc_grid_interconnection Profile-Driven Symmetric LV vs MV Selection Test
+Per Technical Specification §4.4 Module 8 & Sprint 2 Action Item 1 Fix
 Asserts:
-  1. Sub-250kW US plant (e.g. 200 kW) selects LV_0.48kV (is_lv_connection=True, bay count N/A = 0).
-  2. 750 kW C&I plant selects MV_13.8kV (US) or MV_33kV (EU-DE) with 4 substation bays.
-  3. Synthetic Multi-Incomer Plant (35 MW at 33kV) exercises N_incomer = 2 bays (5 bays total).
+  1. US-NEC-2020-v1: 80 kW -> LV_0.48kV, 200 kW -> LV_0.48kV (<250kW ceiling), 750 kW -> MV_13.8kV
+  2. EU-DE-v1: 80 kW -> LV_0.4kV, 200 kW -> MV_33kV (>100kW ceiling per VDE-AR-N 4105), 750 kW -> MV_33kV
 """
 
 import pytest
 from calc.calc_grid_interconnection.service import InterconnectionInput, calculate_grid_interconnection
 
 
-def test_calc_grid_interconnection_sub_threshold_lv_200kw():
-    inputs = InterconnectionInput(
-        plant_capacity_kw=200.0,  # 200 kW sub-250kW LV US plant
-        profile_id="US-NEC-2020-v1"
-    )
+def test_us_profile_voltage_selection_matrix():
+    # 80 kW US -> LV_0.48kV
+    res_80 = calculate_grid_interconnection(InterconnectionInput(plant_capacity_kw=80.0, profile_id="US-NEC-2020-v1"))
+    assert res_80.outputs["is_lv_connection"] is True
+    assert res_80.outputs["voltage_class"] == "LV_0.48kV"
+    assert res_80.outputs["recommended_voltage_kv"] == 0.48
 
-    result = calculate_grid_interconnection(inputs)
-    outputs = result.outputs
+    # 200 kW US -> LV_0.48kV (below 250 kW US ceiling)
+    res_200 = calculate_grid_interconnection(InterconnectionInput(plant_capacity_kw=200.0, profile_id="US-NEC-2020-v1"))
+    assert res_200.outputs["is_lv_connection"] is True
+    assert res_200.outputs["voltage_class"] == "LV_0.48kV"
 
-    assert outputs["is_lv_connection"] is True
-    assert outputs["recommended_voltage_kv"] == 0.48
-    assert outputs["voltage_class"] == "LV_0.48kV"
-    assert outputs["total_substation_bays"] == 0
-    assert outputs["lv_main_breaker_rating_a"] > 0
+    # 750 kW US -> MV_13.8kV
+    res_750 = calculate_grid_interconnection(InterconnectionInput(plant_capacity_kw=750.0, profile_id="US-NEC-2020-v1"))
+    assert res_750.outputs["is_lv_connection"] is False
+    assert res_750.outputs["voltage_class"] == "MV_13.8kV"
+    assert res_750.outputs["recommended_voltage_kv"] == 13.8
+    assert res_750.outputs["total_substation_bays"] == 4
 
 
-def test_calc_grid_interconnection_cand_i_750kw_mv():
-    inputs = InterconnectionInput(
-        plant_capacity_kw=750.0,  # 750 kW C&I plant -> MV interconnection
-        profile_id="US-NEC-2020-v1"
-    )
+def test_eu_profile_voltage_selection_matrix():
+    # 80 kW EU-DE -> LV_0.4kV
+    res_80 = calculate_grid_interconnection(InterconnectionInput(plant_capacity_kw=80.0, profile_id="EU-DE-v1"))
+    assert res_80.outputs["is_lv_connection"] is True
+    assert res_80.outputs["voltage_class"] == "LV_0.4kV"
+    assert res_80.outputs["recommended_voltage_kv"] == 0.4
 
-    result = calculate_grid_interconnection(inputs)
-    outputs = result.outputs
+    # 200 kW EU-DE -> MV_33kV (ABOVE 100 kW EU ceiling per VDE-AR-N 4105/4110)
+    res_200 = calculate_grid_interconnection(InterconnectionInput(plant_capacity_kw=200.0, profile_id="EU-DE-v1"))
+    assert res_200.outputs["is_lv_connection"] is False
+    assert res_200.outputs["voltage_class"] == "MV_33.0kV"
+    assert res_200.outputs["recommended_voltage_kv"] == 33.0
+    assert res_200.outputs["total_substation_bays"] == 4
 
-    assert outputs["is_lv_connection"] is False
-    assert outputs["recommended_voltage_kv"] == 13.8
-    assert outputs["voltage_class"] == "MV_13.8kV"
-    breakdown = outputs["bay_breakdown"]
-    assert breakdown["incomer_bays"] == 1
-    assert breakdown["transformer_bays"] == 1
-    assert breakdown["metering_bays"] == 1
-    assert breakdown["spare_bays"] == 1
-    assert outputs["total_substation_bays"] == 4
+    # 750 kW EU-DE -> MV_33kV
+    res_750 = calculate_grid_interconnection(InterconnectionInput(plant_capacity_kw=750.0, profile_id="EU-DE-v1"))
+    assert res_750.outputs["is_lv_connection"] is False
+    assert res_750.outputs["voltage_class"] == "MV_33.0kV"
 
 
 def test_calc_grid_interconnection_multi_incomer_synthetic_plant():

@@ -55,13 +55,13 @@ Sprint 0 of Phase 2 (Week 1) executes the following mandatory initialization pro
 
 ---
 
-## 4. Carried Phase 1 Limitations & Deferred Items
+## 4. Carried Phase 1 Limitations & Resolution Status
 
-The following Phase 1 items were accepted at the gate as known scaffolding states and will be finalized during Phase 2:
+The following Phase 1 items were accepted at the gate as known scaffolding states and are resolved during Phase 2:
 
-| Carried Limitation | Phase 1 Scaffolding State | Phase 2 Target Milestone |
+| Carried Limitation | Phase 1 Scaffolding State | Phase 2 Target / Resolution Status |
 | :--- | :--- | :--- |
-| **Multi-Role Override Governance** | Single PE user override permitted with min 10-char reason string. | Phase 2 Sprint 2: 2-stage approval workflow (Designer proposes $\rightarrow$ PE confirms). |
+| **Multi-Role Override Governance** | Single PE user override permitted with min 10-char reason string. | **RESOLVED (Sprint 2):** 2-stage PE approval workflow (`proposer_user_id != approver_pe_user_id`) with active status, license expiry, and ISO 3166-2 jurisdiction validation. Note: PE active status verification is self-managed against registered user attributes in local/mock database. |
 | **Android Site-Capture Companion** | Read-only site photo and roof measurement capture. | Phase 4: Full offline commissioning & barcode scanning. |
 | **Advanced Multi-Template Themes** | Baseline proposal template with section toggles and white-label branding. | Phase 2 Sprint 3: Advanced C&I permit package & RFQ reporting booklets. |
 

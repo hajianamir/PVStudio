@@ -7,6 +7,10 @@ Refactored:
      panelboard breaker rating, and bay count = 0 / N/A.
   3. For MV connections (>= MV ceiling), computes component bay breakdown: incomer_bays + transformer_bays + metering_bays + spare_bays.
   4. Standard citations split into Interconnection Requirements (IEEE 1547 / VDE 4110) and Short-Circuit Calculation Methodology (IEEE 141 / IEC 60909).
+  5. Sizing rules:
+     - plant_capacity <= lv_ceiling_kw -> LV
+     - plant_capacity <= 50,000 kW (50 MW C&I / small utility) -> MV (13.8 kV US, 33 kV EU)
+     - plant_capacity > 50,000 kW -> HV 110 kV
 """
 
 import math
@@ -55,7 +59,7 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
         is_lv_connection = True
         recommended_voltage_kv = config["lv_nominal_voltage_kv"]
         voltage_class = f"LV_{recommended_voltage_kv}kV"
-    elif p_kw <= 20000.0:
+    elif p_kw <= 50000.0:
         is_lv_connection = False
         recommended_voltage_kv = config["mv_nominal_voltage_kv"]
         voltage_class = f"MV_{recommended_voltage_kv}kV"
