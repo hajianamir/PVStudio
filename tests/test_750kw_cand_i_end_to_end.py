@@ -56,18 +56,18 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
     assert prot_res.outputs["recommended_ac_breaker_a"] == 630
     assert prot_res.outputs["recommended_ct_ratio"] == "50/5A"
 
-    # 4. Step 5: Grid Interconnection Analysis & Substation Bays
+    # 4. Step 5: Grid Interconnection Analysis & Substation Bays (500 MVA Sk'' -> 9.62 kA)
     grid_input = InterconnectionInput(
         plant_capacity_kw=750.0,
         bay_max_ampacity_a=630.0,
-        grid_impedance_ohm=0.15,
         profile_id="EU-DE-v1"
     )
     grid_res = calculate_grid_interconnection(grid_input)
     assert grid_res.outputs["is_lv_connection"] is False
     assert grid_res.outputs["voltage_class"] == "MV_33.0kV"
     assert grid_res.outputs["total_substation_bays"] == 4
-    assert grid_res.outputs["short_circuit_fault_current_ka"] == 139.72
+    assert grid_res.outputs["short_circuit_fault_current_ka"] == 9.62
+    assert grid_res.outputs["fault_current_warning"] is None
 
     # 5. Step 8: Financial Model (LCOE & Payback)
     fin_input = FinancialInputSchema(
@@ -80,7 +80,7 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
     assert fin_res.outputs["lcoe_usd_kwh"] > 0.03
     assert fin_res.outputs["simple_payback_years"] < 5.0
 
-    # 6. Step 9: Permit Package Generation & Vector SVG Verification
+    # 6. Step 9: Permit Package Generation & SVG Diagram Content Deep Assertion
     pkg_input = PermitPackageInput(
         project_id="PRJ_CAND_I_750KW_001",
         project_name="Apex Logistics Center 750kW Rooftop PV",
@@ -96,8 +96,15 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
 
     assert pkg_res.project_id == "PRJ_CAND_I_750KW_001"
     assert len(pkg_res.sld_metadata["nodes"]) == 6
-    assert "<svg" in pkg_res.rendered_sld_svg
-    assert "SINGLE-LINE DIAGRAM (SLD)" in pkg_res.rendered_sld_svg
-    assert "750.0 kW AC" in pkg_res.rendered_sld_svg
+
+    # SVG Vector Diagram Deep Content Assertions
+    svg = pkg_res.rendered_sld_svg
+    assert svg.count("<rect") >= 5          # Title block + 4 equipment node boxes
+    assert svg.count("<line") >= 4          # Interconnect bus lines
+    assert "SINGLE-LINE DIAGRAM (SLD)" in svg
+    assert "750.0 kW AC" in svg
+    assert "MV_33.0kV" in svg
+    assert "LV/MV Transformer" in svg
+    assert "MV SWITCHGEAR" in svg
     assert len(pkg_res.boq_export) == 6
     assert pkg_res.interconnection_brief["short_circuit_capacity_ka"] == 20.0
