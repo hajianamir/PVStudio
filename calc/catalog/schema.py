@@ -1,7 +1,7 @@
 """
 Equipment Catalog Schema & C&I Medium-Voltage Extension
-Per Technical Specification §2.3.2 & Phase 2 Sprint 1 Scope
-Extends catalog entity definitions to support 3-phase C&I string inverters (50-250 kW),
+Per Technical Specification §2.3.2, Phase 2 Sprint 1 Scope & Clarification 6
+Extends catalog entity definitions to support 3-phase C&I string inverters (50-250 kW) with temperature derating curves,
 LV/MV pad-mounted step-up transformers (100 kVA - 1.25 MVA), and MV switchgear.
 """
 
@@ -20,6 +20,7 @@ class PVModuleCatalogEntity(BaseModel):
     i_sc_a: float
     temp_coeff_pmp_percent: float
     temp_coeff_voc_percent: float
+    temp_coeff_isc_percent: float = Field(default=0.05, description="Isc temperature coefficient [%/°C]")
     noct_c: float = 45.0
     source_url: str
     validation_timestamp: str
@@ -39,6 +40,8 @@ class InverterCatalogEntity(BaseModel):
     v_mppt_max_v: float
     v_dc_max_v: float
     euro_efficiency_percent: float
+    derating_start_temp_c: float = Field(default=45.0, description="Ambient temperature where thermal derating begins [°C]")
+    derating_slope_percent_per_c: float = Field(default=2.0, description="Power derating rate per °C above start temp [%/°C]")
     source_url: str
     validation_timestamp: str
 
@@ -51,6 +54,7 @@ class TransformerCatalogEntity(BaseModel):
     v_primary_v: float = Field(..., gt=0, description="Primary low-voltage side [V, e.g. 800V]")
     v_secondary_kv: float = Field(..., gt=0, description="Secondary medium-voltage side [kV, e.g. 33kV]")
     impedance_percent: float = Field(default=6.0, description="Short-circuit impedance Z [%]")
+    cooling_class: str = Field(default="ONAN", description="Transformer cooling class (ONAN, ONAF, Dry)")
     efficiency_percent: float = Field(default=98.8, ge=90, le=100)
     source_url: str
     validation_timestamp: str
@@ -63,5 +67,6 @@ class SwitchgearCatalogEntity(BaseModel):
     rated_voltage_kv: float = Field(..., gt=0)
     rated_current_a: float = Field(default=630.0, gt=0)
     short_time_withstand_current_ka: float = Field(default=25.0, gt=0)
+    breaking_capacity_icu_ka: float = Field(default=25.0, gt=0, description="Rated ultimate short-circuit breaking capacity [kA]")
     source_url: str
     validation_timestamp: str

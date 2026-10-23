@@ -2,14 +2,20 @@
 Compliance Layer & Refusal-to-Guess Safeguard Checker
 Per Technical Specification §6.4 & Gate Criterion G4
 Supports strict refusal on incomplete profiles and audited 2-Stage PE Override Workflow
-(Designer Proposes -> PE Confirms with Jurisdiction License Tracking & Segregation of Duties).
+with controlled ISO 3166-2 jurisdiction matching, license expiry checks, and active status verification.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 
 OVERRIDE_WATERMARK_HEADER = "APPROVED WITH QUALIFIED PROFESSIONAL ENGINEER OVERRIDE — LOCAL ENGINEER SIGN-OFF REQUIRED"
+
+# Controlled ISO 3166-2 Jurisdiction Codes
+VALID_ISO_3166_2_JURISDICTIONS = {
+    "US-CA", "US-NY", "US-TX", "US-FL", "US-WY", "US-MA",
+    "DE", "DE-BY", "DE-BE", "AU-NSW", "AU-VIC", "AU-QLD"
+}
 
 
 class ComplianceProfile(BaseModel):
@@ -35,6 +41,8 @@ def evaluate_design_compliance(
     proposer_user_id: Optional[str] = None,
     approver_pe_user_id: Optional[str] = None,
     pe_license_jurisdiction: Optional[str] = None,
+    pe_license_expiry_date: Optional[str] = None,  # YYYY-MM-DD
+    is_pe_active: bool = True,
     override_reason: Optional[str] = None
 ) -> ComplianceCheckResult:
     """
@@ -43,7 +51,7 @@ def evaluate_design_compliance(
 
     Phase 2 Two-Stage PE Override Workflow:
       1. Proposer and Approver MUST be different users (Segregation of Duties).
-      2. Approver MUST provide PE license jurisdiction matching profile jurisdiction.
+      2. Approver MUST be active and have unexpired PE license matching profile ISO 3166-2 jurisdiction.
       3. Override reason MUST be >= 10 characters.
     """
     profile_dict = profile.model_dump()
@@ -54,25 +62,51 @@ def evaluate_design_compliance(
     if missing_rules:
         # Check 2-Stage PE Override Path
         if override_reason and len(override_reason.strip()) >= 10 and proposer_user_id and approver_pe_user_id:
-            # Segregation of Duties Assertion
+            # 1. Segregation of Duties Assertion
             if proposer_user_id == approver_pe_user_id:
                 return ComplianceCheckResult(
                     is_approved=False,
                     status_code="REFUSAL_SELF_OVERRIDE_PROHIBITED",
-                    warning_message="CRITICAL: Segregation of duties violation. Proposer and Approver PE cannot be the same user.",
+                    warning_message=f"You cannot approve your own design override. Ask a PE licensed in '{profile.jurisdiction}' to review and confirm this override.",
                     required_engineer_signoff=True,
                     is_override_applied=False,
                     client_visible_watermark="UNAPPROVED DRAFT — SEGREGATION OF DUTIES VIOLATION",
                     override_audit_trail=None
                 )
 
-            # Jurisdiction License Matching
-            profile_state = profile.jurisdiction.split("-")[0]  # e.g. US or EU
-            if pe_license_jurisdiction and profile_state not in pe_license_jurisdiction:
+            # 2. PE Active Status Verification
+            if not is_pe_active:
                 return ComplianceCheckResult(
                     is_approved=False,
-                    status_code="REFUSAL_PE_JURISDICTION_MISMATCH",
-                    warning_message=f"CRITICAL: PE license jurisdiction '{pe_license_jurisdiction}' does not match project jurisdiction '{profile.jurisdiction}'.",
+                    status_code="REFUSAL_PE_INACTIVE",
+                    warning_message=f"CRITICAL: PE user '{approver_pe_user_id}' is inactive or revoked. Override rejected.",
+                    required_engineer_signoff=True,
+                    is_override_applied=False,
+                    client_visible_watermark="UNAPPROVED DRAFT — INACTIVE PE USER",
+                    override_audit_trail=None
+                )
+
+            # 3. PE License Expiry Verification
+            if pe_license_expiry_date:
+                today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                if pe_license_expiry_date < today_str:
+                    return ComplianceCheckResult(
+                        is_approved=False,
+                        status_code="REFUSAL_PE_LICENSE_EXPIRED",
+                        warning_message=f"CRITICAL: PE license for '{approver_pe_user_id}' expired on {pe_license_expiry_date}. Override rejected.",
+                        required_engineer_signoff=True,
+                        is_override_applied=False,
+                        client_visible_watermark="UNAPPROVED DRAFT — EXPIRED PE LICENSE",
+                        override_audit_trail=None
+                    )
+
+            # 4. Controlled ISO 3166-2 Jurisdiction License Matching
+            profile_prefix = profile.jurisdiction.split("-")[0]  # e.g. US or DE
+            if not pe_license_jurisdiction or pe_license_jurisdiction not in VALID_ISO_3166_2_JURISDICTIONS or profile_prefix not in pe_license_jurisdiction:
+                return ComplianceCheckResult(
+                    is_approved=False,
+                    status_code="REFUSAL_NO_PE_IN_JURISDICTION",
+                    warning_message=f"No PE licensed in '{profile.jurisdiction}' is currently available on the platform for override approval. Contact platform administration.",
                     required_engineer_signoff=True,
                     is_override_applied=False,
                     client_visible_watermark="UNAPPROVED DRAFT — PE JURISDICTION MISMATCH",
@@ -84,7 +118,8 @@ def evaluate_design_compliance(
                 "workflow_stage": "TWO_STAGE_PE_APPROVED",
                 "proposer_user_id": proposer_user_id,
                 "approver_pe_user_id": approver_pe_user_id,
-                "pe_license_jurisdiction": pe_license_jurisdiction or profile.jurisdiction,
+                "pe_license_jurisdiction": pe_license_jurisdiction,
+                "pe_license_expiry_date": pe_license_expiry_date,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "override_reason": override_reason.strip(),
                 "missing_rules": missing_rules,
