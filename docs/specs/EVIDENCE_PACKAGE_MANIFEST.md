@@ -1,26 +1,30 @@
-# Phase 1 Acceptance Gate Evidence Package Manifest
+# Phase 2 Evidence Package Manifest
 
 ```
-Phase: Phase 1 — Residential MVP
-Version: 1.0.0
-Freeze Date: Sprint 6 Week 3
-Status: FROZEN — Ready for Gate Review
-Navigability Standard: < 2 min lookup target (Claim, File Path & Page, Verification Method, Owner)
+Phase Transition: Phase 2 (C&I Expansion & Procurement) -> Phase 2 Final Acceptance Gate Review
+Master Spec Version: PVStudio_Technical_Product_Specification.md v1.0.0 (FROZEN)
+Gate Criteria Suite: G11 through G20
+Evidence Package Freeze Date: 2025-02-18
+Automated Test Runner: tests/test_750kw_cand_i_end_to_end.py & poetry run pytest tests/
 ```
+
+| Gate ID | Gate Title | Verification Artifact Source | Automated / Manual | Final Gate Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **G11** | **C&I 9-Step Menu Tree** | `app/ui/cand_i_workflow.py` / `tests/test_cand_i_workflow.py` | Automated CI | **PASS** |
+| **G12** | **Symmetric Voltage & DC Guard** | `calc_grid_interconnection` / `calc_sizing_dc` / `tests/test_calc_sizing_dc.py` | Automated CI | **PASS** |
+| **G13** | **Substation Bay Breakdown** | `calc_grid_interconnection` / `tests/test_calc_grid_interconnection.py` | Automated CI | **PASS** |
+| **G14** | **MV Protection & Relaying** | `calc_protection` / `tests/test_sprint3_cand_i_extensions.py` | Automated CI | **PASS** |
+| **G15** | **IEC 60909 Short-Circuit Current**| `calc_grid_interconnection` / `tests/test_750kw_cand_i_end_to_end.py` | Automated CI | **PASS** |
+| **G16** | **Civil Pad Design & Banners** | `calc_civil` / `app/services/permit_package_generator.py` | Automated CI | **PASS** |
+| **G17** | **Procurement BOQ & RFQ** | `app/services/rfq_service.py` / `tests/test_sprint4_cand_i_deliverables.py` | Automated CI | **PASS** |
+| **G18** | **Dual Proposal Booklet** | `app/services/cand_i_proposal_generator.py` / `tests/test_sprint4_cand_i_deliverables.py` | Automated CI | **PASS** |
+| **G19** | **2-Stage PE Governance** | `calc/compliance/checker.py` / `tests/test_compliance_refusal.py` | Automated CI | **PASS** |
+| **G20** | **750 kW End-to-End Export** | `tests/test_750kw_cand_i_end_to_end.py` | Automated CI & Manual Audit | **PASS** |
 
 ---
 
-## Artifacts Manifest Directory (10/10 Gate Criteria Covered)
+## Phase 1 Acceptance Regression Gate Status
 
-| Gate ID | Gate Claim | Artifact Exact File Path & Location | Verification Method / Command | Responsible Owner |
-| :--- | :--- | :--- | :--- | :--- |
-| **G1** | Address $\rightarrow$ Proposal $<30$ min working time. | `docs/specs/evidence/G1_walkthrough.pdf` (Page 1) | Open PDF; check elapsed time (18 min 45 sec) & John Smith (Apex Solar) sign-off. | Product Manager |
-| **G2** | All 10 benchmarks pass (B1–B9 yield, B10 string window). | `tests/benchmarks/run_all.py` | Run `python tests/benchmarks/run_all.py`; check per-case deltas vs PVsyst 7.4.2. | Lead PV Engineer |
-| **G3** | 100% persisted calculation results carry envelope. | `tests/test_provenance.py` | Run `pytest tests/test_provenance.py`; verify 4 rejection paths pass. | Lead Backend Engineer |
-| **G4** | Refusal-to-guess blocks incomplete profiles & watermarks PDF. | `tests/test_compliance_refusal.py` & `docs/specs/evidence/G4_watermark.pdf` | Run `pytest tests/test_compliance_refusal.py` & `pdftotext G4_watermark.pdf - \| grep OVERRIDE`. | Lead Compliance Engineer |
-| **G5** | Weather metadata stamp printed in report PDF text layer. | `tests/test_proposal_generator.py` & `docs/specs/evidence/sample_proposal.pdf` (Page 1) | Run `pytest tests/test_proposal_generator.py`; check provider, vintage, resolution, override. | Lead Backend Engineer |
-| **G6** | Section toggles & white-label branding functional in PDF. | `tests/test_whitelabel_branding.py` & `docs/specs/evidence/G6_branding_header.png` | Open `G6_branding_header.png`; confirm #1e40af color, logo, and sign-off. | UI/UX Architect |
-| **G7** | RTL-ready layout with 0 physical CSS violations. | `tests/test_rtl_layout.py` | Run `pytest tests/test_rtl_layout.py`; verify static scanner output list. | UI/UX Architect |
-| **G8** | 0 marketing buzzwords across codebase & templates. | `audit_marketing.py` | Run `python audit_marketing.py`; check 0 hits across all files. | Lead Architect |
-| **G9** | 100% catalog entries have source URLs & timestamps. | `calc/compliance/profiles/` & Catalog ingest audit log | Open catalog log; verify source URL and validation timestamp for each entry. | Lead Data Architect |
-| **G10** | Off-grid and hybrid end-to-end runs produce proposals. | `docs/specs/evidence/Case_7_Offgrid_Proposal.pdf` & `Case_8_Hybrid_Proposal.pdf` | Open `Case_7_Offgrid_Proposal.pdf` & `Case_8_Hybrid_Proposal.pdf`; check string + battery. | Lead PV Engineer |
+| Phase 1 Gate ID | Gate Title | Regression Test Runner | Final Status |
+| :--- | :--- | :--- | :--- |
+| **G1–G10** | **Phase 1 Acceptance Suite** | `tests/run_phase1_acceptance_gates.py` | **PASS (100% Green)** |
