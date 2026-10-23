@@ -52,11 +52,10 @@ def test_procurement_rfq_service_generation():
     res = ProcurementRFQService.generate_procurement_rfq(inputs)
 
     assert res.project_id == "PRJ_CAND_I_750KW_001"
+    assert res.dc_ac_ratio == 1.072  # 750.06 kW DC / 700 kW AC
     assert len(res.bom_line_items) == 6
 
-    # Assert explicit line-item equipment quantities & exact extended cost math:
-    # 1852 * 85 = 157420; 7 * 4200 = 29400; Trafo = 28000; Switchgear = 18500; Cable = 11250; Civil = 14500
-    # Sum = 157420 + 29400 + 28000 + 18500 + 11250 + 14500 = 259070.0
+    # Assert explicit line-item equipment quantities
     modules_item = next(item for item in res.bom_line_items if item["category"] == "PV_MODULES")
     assert modules_item["quantity"] == 1852
     assert modules_item["unit_cost_usd"] == 85.0
@@ -66,7 +65,8 @@ def test_procurement_rfq_service_generation():
     assert inverters_item["quantity"] == 7
     assert inverters_item["unit_cost_usd"] == 4200.0
 
-    assert res.total_estimated_capex == 259070.0
+    assert res.equipment_bom_capex == 259070.0
+    assert res.estimated_turnkey_epc_capex == 600048.0  # $0.80/W turnkey installed EPC cost
     assert "REQUEST FOR QUOTATION (RFQ)" in res.rfq_document_text
     assert "Apex Logistics Center" in res.rfq_document_text
 

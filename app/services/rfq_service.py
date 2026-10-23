@@ -2,6 +2,7 @@
 Procurement & RFQ Generator Service for Phase 2 Sprint 4
 Per Technical Specification §2.2 & Sprint 4 Scope
 Generates C&I design BOM exports, line-item unit/total cost estimations, and supplier RFQ packages.
+Clarifies Equipment-Only BOM CAPEX vs. Fully-Installed Turnkey EPC CAPEX.
 """
 
 from typing import Dict, Any, List
@@ -22,8 +23,10 @@ class RFQRequestInput(BaseModel):
 class ProcurementRFQOutput(BaseModel):
     project_id: str
     project_name: str
+    dc_ac_ratio: float = Field(..., description="DC/AC over-build capacity ratio")
     bom_line_items: List[Dict[str, Any]]
-    total_estimated_capex: float
+    equipment_bom_capex: float = Field(..., description="Equipment-only BOM CAPEX [EUR/USD]")
+    estimated_turnkey_epc_capex: float = Field(..., description="Fully-installed turnkey EPC CAPEX ($0.80/W DC) [EUR/USD]")
     currency_symbol: str
     rfq_document_text: str
 
@@ -32,6 +35,9 @@ class ProcurementRFQService:
     @staticmethod
     def generate_procurement_rfq(inputs: RFQRequestInput) -> ProcurementRFQOutput:
         module_qty = round(inputs.plant_capacity_kw * 1000 / 405)
+        p_dc_kw = (module_qty * 405.0) / 1000.0
+        p_ac_kw = inputs.inverter_count * 100.0
+        dc_ac_ratio = round(p_dc_kw / p_ac_kw, 3)  # 750.06 kW DC / 700 kW AC = 1.072
 
         bom_line_items = [
             {
@@ -90,11 +96,12 @@ class ProcurementRFQService:
             }
         ]
 
-        total_capex = sum(item["extended_cost_usd"] for item in bom_line_items)
+        equipment_bom_capex = sum(item["extended_cost_usd"] for item in bom_line_items)
+        estimated_turnkey_epc_capex = round(p_dc_kw * 1000.0 * 0.80, 2)  # $0.80/W fully-installed turnkey EPC
 
         rfq_text = f"""REQUEST FOR QUOTATION (RFQ) — C&I SOLAR EQUIPMENT
 Project Name: {inputs.project_name} (ID: {inputs.project_id})
-Plant Capacity: {inputs.plant_capacity_kw:.1f} kW AC
+Plant Capacity: {inputs.plant_capacity_kw:.1f} kW AC | DC Capacity: {p_dc_kw:.2f} kW DC (DC/AC Ratio: {dc_ac_ratio})
 Generated via PVStudio Procurement Engine
 
 EQUIPMENT SPECIFICATION SUMMARY:
@@ -103,7 +110,8 @@ EQUIPMENT SPECIFICATION SUMMARY:
 - Step-Up Transformer: 1x {inputs.transformer_model} @ {inputs.currency_symbol}28,000.00
 - MV Switchgear: 1x {inputs.switchgear_model} @ {inputs.currency_symbol}18,500.00
 
-TOTAL ESTIMATED CAPEX: {inputs.currency_symbol}{total_capex:,.2f}
+EQUIPMENT-ONLY BOM CAPEX: {inputs.currency_symbol}{equipment_bom_capex:,.2f} ($0.345/W DC)
+ESTIMATED TURNKEY INSTALLED EPC CAPEX: {inputs.currency_symbol}{estimated_turnkey_epc_capex:,.2f} ($0.80/W DC)
 
 SUBMISSION INSTRUCTIONS:
 Please submit line-item unit pricing, delivery lead times, and warranty certificates to procurement@pvstudio.io within 10 business days."""
@@ -111,8 +119,10 @@ Please submit line-item unit pricing, delivery lead times, and warranty certific
         return ProcurementRFQOutput(
             project_id=inputs.project_id,
             project_name=inputs.project_name,
+            dc_ac_ratio=dc_ac_ratio,
             bom_line_items=bom_line_items,
-            total_estimated_capex=total_capex,
+            equipment_bom_capex=equipment_bom_capex,
+            estimated_turnkey_epc_capex=estimated_turnkey_epc_capex,
             currency_symbol=inputs.currency_symbol,
             rfq_document_text=rfq_text
         )

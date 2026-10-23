@@ -90,14 +90,16 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
         inverter_model="Huawei SUN2000-100KTL-M2",
         inverter_count=7,
         transformer_model="Schneider Trihal 1000kVA 0.8/30kV",
-        switchgear_model="ABB SafeRing 36kV 630A CCV Ring Main Unit"
+        switchgear_model="ABB SafeRing 36kV 630A CCV Ring Main Unit",
+        requires_geotech_verification=True,
+        requires_site_specific_wind_data=True
     )
     pkg_res = PermitPackageGeneratorService.generate_permit_package(pkg_input)
 
     assert pkg_res.project_id == "PRJ_CAND_I_750KW_001"
     assert len(pkg_res.sld_metadata["nodes"]) == 6
 
-    # SVG Vector Diagram Deep Content Assertions
+    # SVG Vector Diagram Deep Content & Text-Layer Warnings Assertions
     svg = pkg_res.rendered_sld_svg
     assert svg.count("<rect") >= 5          # Title block + 4 equipment node boxes
     assert svg.count("<line") >= 4          # Interconnect bus lines
@@ -106,5 +108,9 @@ def test_750kw_cand_i_end_to_end_benchmark_run():
     assert "MV_30.0kV" in svg
     assert "LV/MV Transformer" in svg
     assert "MV SWITCHGEAR" in svg
+    assert "GEOTECHNICAL SOIL BEARING VERIFICATION REQUIRED" in svg
+    assert "SITE-SPECIFIC WIND PRESSURE DATA VERIFICATION REQUIRED" in svg
+
     assert len(pkg_res.boq_export) == 6
     assert pkg_res.interconnection_brief["short_circuit_capacity_ka"] == 20.0
+    assert "FOUNDATION DESIGN ASSUMES 150 kPa BEARING CAPACITY" in pkg_res.interconnection_brief["visible_warning_notices"][0]
