@@ -5,7 +5,7 @@ Phase Transition: Phase 2 (C&I Expansion & Procurement) -> Phase 2 Final Accepta
 Master Spec Version: PVStudio_Technical_Product_Specification.md v1.0.0 (FROZEN)
 Gate Criteria Suite: G11 through G20
 Evidence Package Freeze Tag: v1.0.0-phase2-freeze
-Evidence Package SHA-256 Checksum: a5f12265cc411688b614626c6672e4c95e07aaf96e11f54d2dc3ec2e4f86e99d
+Evidence Package SHA-256 Checksum: a8384749dc26953a91e90ff2978fe21fc55687c5c50248a19c78098fdb1f10a2
 Evidence Freeze Date: 2026-10-23 (Phase 2 Sprint 5 Week 3 Close)
 Automated Test Runner: tests/test_750kw_cand_i_end_to_end.py & poetry run pytest tests/
 ```
