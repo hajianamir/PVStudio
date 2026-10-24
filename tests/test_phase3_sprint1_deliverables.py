@@ -18,9 +18,10 @@ def test_calc_bankability_monte_carlo_p50_p75_p90_convergence():
     inputs = BankabilityInputSchema(
         plant_capacity_kw=50000.0,
         annual_p50_yield_kwh=89385875.0,  # 89.39 GWh P50
+        turnkey_project_capex_usd=40000000.0,  # $40M CAPEX ($0.80/W DC)
         iterations=10000,
         debt_service_annual_usd=2500000.0,
-        net_operating_income_year1_usd=3600000.0,
+        net_operating_income_year1_p50_usd=3600000.0,
         loan_tenor_years=20,
         profile_id="EU-DE-v1"
     )
@@ -35,10 +36,17 @@ def test_calc_bankability_monte_carlo_p50_p75_p90_convergence():
     assert abs(outputs["specific_yield_dc_kwh_kwp_yr"] - 1670.8) <= 1.0
     assert outputs["performance_ratio_pr"] == 0.815
     assert len(outputs["dscr_twenty_year_schedule"]) == 20
-    assert outputs["dscr_year1_p90"] == 1.32
-    assert outputs["minimum_dscr_p90"] == 1.20  # Minimum DSCR occurring in Year 20 due to 0.5%/yr degradation
+    assert outputs["dscr_year1_p50"] == 1.44  # P50 Basis Year-1 DSCR ($3.6M / $2.5M = 1.44x)
+    assert outputs["dscr_year1_p90"] == 1.32  # P90 Basis Year-1 DSCR ($3.311M / $2.5M = 1.32x)
+    assert outputs["minimum_dscr_p90"] == 1.20  # Minimum DSCR occurring in Year 20 ($3.01M / $2.5M = 1.20x)
     assert outputs["minimum_dscr_year"] == 20
     assert outputs["is_bankable_dscr_compliant"] is True
+
+    # Capital Structure & Leverage Rollup Assertions
+    cap = outputs["capital_structure_and_debt_sizing"]
+    assert cap["turnkey_project_capex_usd"] == 40000000.0
+    assert cap["senior_debt_principal_usd"] == 28674803.05
+    assert cap["leverage_debt_ratio_percent"] == 71.69
 
     # SAM 2023.12.08 Reference Harness Comparison
     sam = outputs["sam_reference_baseline_comparison"]
@@ -96,5 +104,9 @@ def test_hv_substation_grid_interconnection_50mw():
     assert outputs["voltage_class"] == "HV_110.0kV"
     assert outputs["recommended_voltage_kv"] == 110.0
     assert outputs["transformer_mva_recommended"] == 55.0  # 50MW / 0.95 = 52.6MVA -> 55 MVA
+    assert outputs["grid_short_circuit_capacity_mva"] == 3500.0  # 3500 MVA HV utility transmission capacity
+    assert outputs["switchgear_interrupting_rating_ka"] == 25.0  # Selected 25 kA switchgear for 20.21 kA fault current
     assert outputs["short_circuit_fault_current_ka"] == 20.21  # (1.10 * 3500) / (sqrt(3) * 110) = 20.21 kA
+    assert outputs["scada_poi_specification"]["scada_rtu_telemetry_protocol"] == "IEC 60870-5-104 / DNP3 over IP"
+    assert outputs["requires_utility_data_verification"] is True
     assert outputs["fault_current_warning"] is None

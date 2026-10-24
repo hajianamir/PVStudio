@@ -1,7 +1,7 @@
 """
-Equipment Catalog Seed Entries (Phase 1 Residential + Phase 2 C&I Medium Voltage Equipment)
-Per Technical Specification §2.1 & Phase 2 Sprint 2 Scope
-Seeded with real manufacturer C&I equipment entries (Jinko, Trina, Canadian Solar, Fronius, SMA, Huawei, Sungrow, Schneider, ABB).
+Equipment Catalog Seed Entries (Phase 1 Residential + Phase 2 C&I + Phase 3 Utility-Scale Equipment)
+Per Technical Specification §2.1 & Phase 3 Scope
+Seeded with real manufacturer Utility-Scale equipment entries (Sungrow SG3125HV Central Inverter Skid Station).
 """
 
 from typing import List, Dict, Any
@@ -133,6 +133,25 @@ SEED_INVERTERS = [
         "derating_slope_percent_per_c": 2.0,
         "source_url": "https://us.sungrowpower.com/product/SG250HX",
         "validation_timestamp": "2025-02-18T12:00:00Z"
+    },
+    {
+        "id": "inv_util_sungrow_3125kw_central",
+        "manufacturer": "Sungrow Power Supply",
+        "model_name": "SG3125HV 1500V Containerized Central Inverter Turnkey Station",
+        "inverter_type": "CENTRAL_SKID",
+        "p_ac_kw": 3125.0,
+        "v_ac_nominal_v": 30000.0,  # Containerized MV output (30kV)
+        "phases": 3,
+        "mppt_count": 1,
+        "inputs_per_mppt": 24,
+        "v_mppt_min_v": 875.0,
+        "v_mppt_max_v": 1300.0,
+        "v_dc_max_v": 1500.0,
+        "euro_efficiency_percent": 99.0,
+        "derating_start_temp_c": 50.0,
+        "derating_slope_percent_per_c": 1.8,
+        "source_url": "https://us.sungrowpower.com/product/SG3125HV",
+        "validation_timestamp": "2026-10-23T12:00:00Z"
     }
 ]
 

@@ -3,8 +3,9 @@ calc_grid_interconnection: C&I and Utility-Scale Interconnection Point Analysis,
 Per Technical Specification §4.4 Module 8 & Phase 3 Scope
 Refactored:
   1. Extends grid interconnection analysis up to High-Voltage (HV) transmission levels (110kV/220kV/380kV EU, 115kV/138kV/230kV/345kV/500kV US).
-  2. Differentiates default utility short-circuit capacity Sk'' for MV (500 MVA EU / 250 MVA US) vs HV (3500 MVA EU / 2500 MVA US).
-  3. Calculates HV substation transformer MVA sizing, HV switchgear bay decomposition, and IEEE C37.010 / IEC 60909 HV short-circuit currents.
+  2. Calculates HV substation transformer MVA sizing, HV switchgear bay decomposition, and IEEE C37.010 / IEC 60909 HV short-circuit currents.
+  3. Explicitly outputs source Sk'' capacity (3500 MVA EU / 2500 MVA US), requires_utility_data_verification flag, and selected switchgear interrupting rating.
+  4. Includes SCADA RTU telemetry and POI recloser specifications.
 """
 
 import math
@@ -88,6 +89,7 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
         total_substation_bays = 0
         lv_main_breaker_rating_a = math.ceil(i_ac_interconnection_a * 1.25)
         transformer_mva_recommended = 0.0
+        switchgear_interrupting_rating_ka = 0.0
     else:
         incomer_bays_required = math.ceil(i_ac_interconnection_a / inputs.bay_max_ampacity_a)
         transformer_bays = 1 if recommended_voltage_kv >= 11.0 else 0
@@ -117,10 +119,23 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
         i_fault_ka = (c_factor * sk_mva * 1000.0) / (math.sqrt(3) * (recommended_voltage_kv * 1000.0))
         grid_short_circuit_mva_calc = sk_mva
 
+    # Select standard switchgear interrupting rating (16, 25, 31.5, 40, 50 kA)
+    if not is_lv_connection:
+        standard_ratings = [16.0, 25.0, 31.5, 40.0, 50.0]
+        switchgear_interrupting_rating_ka = next((r for r in standard_ratings if r >= i_fault_ka), 50.0)
+
     # Sanity Range Protection Check (0.5 kA to 50.0 kA for MV/HV connections)
     fault_current_warning = None
     if not is_lv_connection and (i_fault_ka < 0.5 or i_fault_ka > 50.0):
         fault_current_warning = f"FaultCurrentOutOfRange: Calculated grid fault current {i_fault_ka:.2f} kA is outside realistic grid range (0.5-50 kA). Utility verification required."
+
+    # SCADA RTU & POI Recloser Specification
+    scada_poi_specification = {
+        "scada_rtu_telemetry_protocol": "IEC 60870-5-104 / DNP3 over IP",
+        "poi_recloser_type": "3-Phase Vacuum Recloser with Numerical Relay Interface",
+        "remote_trip_and_close_enabled": True,
+        "revenue_metering_class": "0.2S Accuracy Class Active Energy Meter"
+    }
 
     inputs_dict = inputs.model_dump()
     input_hash = compute_input_hash(inputs_dict)
@@ -140,6 +155,7 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
         "interconnection_current_a": round(i_ac_interconnection_a, 2),
         "lv_main_breaker_rating_a": lv_main_breaker_rating_a if is_lv_connection else None,
         "transformer_mva_recommended": transformer_mva_recommended if not is_lv_connection else None,
+        "switchgear_interrupting_rating_ka": switchgear_interrupting_rating_ka if not is_lv_connection else None,
         "bay_breakdown": bay_breakdown,
         "total_substation_bays": total_substation_bays,
         "grid_short_circuit_capacity_mva": round(grid_short_circuit_mva_calc, 2),
@@ -148,6 +164,7 @@ def calculate_grid_interconnection(inputs: InterconnectionInput) -> CalculationR
         "fault_current_warning": fault_current_warning,
         "grid_impedance_source_policy": GRID_IMPEDANCE_SOURCE_POLICY,
         "requires_utility_data_verification": inputs.is_grid_impedance_assumed,
+        "scada_poi_specification": scada_poi_specification,
         "standards_citations": {
             "interconnection_standard": config["interconnection_standard"],
             "short_circuit_methodology_standard": config["short_circuit_methodology_standard"]
