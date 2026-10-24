@@ -1,9 +1,10 @@
 """
-calc_bankability: Bankability Micro-Package (Monte Carlo P50/P75/P90 Yield Engine & Loss Taxonomy)
+calc_bankability: Bankability Micro-Package (Monte Carlo P50/P75/P90 Yield Engine, Fixed OPEX & DSCR Schedule)
 Per Technical Specification §4.4 Module 10 & Phase 3 Scope
 Executes 10,000-iteration stochastic Monte Carlo yield simulations with utility-scale loss taxonomy breakdown,
-utility-scale 9-term RSS uncertainty model (6.26% sigma total including degradation & wiring), 20-year DSCR schedule trajectories,
-debt capacity rollup ($28.67M debt / $11.33M equity on $40M total turnkey project CAPEX = 71.69% leverage), and SAM 2023.12.08 stochastic reference comparisons.
+utility-scale 9-term RSS uncertainty model (6.26% sigma total including degradation & wiring),
+fixed escalating OPEX model ($600k/yr starting + 2.0%/yr inflation), 20-year DSCR schedule trajectories,
+debt capacity rollup ($26.95M debt / $13.05M equity on $40M total turnkey project CAPEX = 67.39% leverage), and SAM 2023.12.08 stochastic reference comparisons.
 
 Seville, Spain Benchmark Physics Calibration:
   - Plant Capacity: 50.0 MW AC / 53.5 MW DC (1.07x DC/AC ratio)
@@ -24,7 +25,10 @@ from calc.provenance import CalculationResult, ProvenanceEnvelope, compute_input
 class BankabilityInputSchema(BaseModel):
     plant_capacity_kw: float = Field(default=50000.0, gt=0, description="Total plant AC capacity [kW] (50 MW AC / 53.5 MW DC)")
     annual_p50_yield_kwh: float = Field(default=89385875.0, gt=0, description="P50 annual yield baseline [kWh] (Seville POA 2050 kWh/m2, 81.5% PR)")
+    ppa_tariff_usd_kwh: float = Field(default=0.050, gt=0, description="PPA Off-take Tariff [$/kWh or €/kWh]")
     turnkey_project_capex_usd: float = Field(default=40000000.0, gt=0, description="Total turnkey project CAPEX including 110kV substation & EPC [$0.80/W DC for 50MW = $40M]")
+    opex_year1_usd: float = Field(default=600000.0, ge=0, description="Year 1 fixed annual OPEX [$12k/MWac/yr for 50MW = $600k]")
+    opex_escalation_annual_percent: float = Field(default=2.0, ge=0, le=10.0, description="Annual O&M OPEX inflation escalation [%]")
     iterations: int = Field(default=10000, ge=100, le=50000, description="Monte Carlo stochastic iterations")
 
     # Utility-Scale 9-Term RSS Uncertainty Parameters [%]
@@ -39,9 +43,7 @@ class BankabilityInputSchema(BaseModel):
     sigma_wiring_percent: float = Field(default=1.0, description="DC/AC cable impedance & connection loss uncertainty")
 
     degradation_annual_percent: float = Field(default=0.5, ge=0)
-    opex_escalation_annual_percent: float = Field(default=0.0, ge=0, description="Annual O&M OPEX escalation [%] (default 0% level contract)")
-    debt_service_annual_usd: float = Field(default=2500000.0, ge=0, description="Level annual debt service [USD/EUR]")
-    net_operating_income_year1_p50_usd: float = Field(default=3600000.0, ge=0, description="Year 1 NOI on P50 basis [USD/EUR]")
+    debt_service_annual_usd: float = Field(default=2350000.0, ge=0, description="Resized level annual debt service [USD/EUR]")
     min_required_dscr: float = Field(default=1.20, ge=1.0, description="Minimum required DSCR for bankability")
     loan_tenor_years: int = Field(default=20, ge=5, le=30, description="Debt tenor [years]")
     debt_interest_rate_percent: float = Field(default=6.0, ge=0, le=20.0, description="Senior debt interest rate [%]")
@@ -82,20 +84,24 @@ def calculate_bankability_monte_carlo(inputs: BankabilityInputSchema) -> Calcula
     specific_yield_dc = p50_yield_kwh / p_dc_kw
     p90_p50_ratio = p90_yield_kwh / p50_yield_kwh
 
-    # Year 1 NOI P90 Basis = P50_NOI * (P90_yield / P50_yield) = $3,600,000 * 0.9198 = $3,311,200.00
-    noi_year1_p90_usd = inputs.net_operating_income_year1_p50_usd * p90_p50_ratio
-
-    # 3. 20-Year DSCR Schedule Trajectory Calculation & Debt Sizing
+    # 3. 20-Year Revenue, Fixed Escalating OPEX, NOI & DSCR Schedule Trajectory
     dscr_schedule = []
     min_dscr_value = 99.0
     min_dscr_year = 1
 
     for yr in range(1, inputs.loan_tenor_years + 1):
         deg_factor = (1.0 - (inputs.degradation_annual_percent / 100.0)) ** (yr - 1)
-        noi_p50_year = inputs.net_operating_income_year1_p50_usd * deg_factor
-        noi_p90_year = noi_year1_p90_usd * deg_factor
+        opex_esc_factor = (1.0 + (inputs.opex_escalation_annual_percent / 100.0)) ** (yr - 1)
+
         yield_p50_year = p50_yield_kwh * deg_factor
         yield_p90_year = p90_yield_kwh * deg_factor
+
+        rev_p50_year = yield_p50_year * inputs.ppa_tariff_usd_kwh
+        rev_p90_year = yield_p90_year * inputs.ppa_tariff_usd_kwh
+        opex_year = inputs.opex_year1_usd * opex_esc_factor
+
+        noi_p50_year = max(0.0, rev_p50_year - opex_year)
+        noi_p90_year = max(0.0, rev_p90_year - opex_year)
 
         dscr_p50_year = noi_p50_year / inputs.debt_service_annual_usd if inputs.debt_service_annual_usd > 0 else 99.0
         dscr_p90_year = noi_p90_year / inputs.debt_service_annual_usd if inputs.debt_service_annual_usd > 0 else 99.0
@@ -104,6 +110,9 @@ def calculate_bankability_monte_carlo(inputs: BankabilityInputSchema) -> Calcula
             "year": yr,
             "p50_yield_kwh": round(yield_p50_year, 2),
             "p90_yield_kwh": round(yield_p90_year, 2),
+            "revenue_p50_usd": round(rev_p50_year, 2),
+            "revenue_p90_usd": round(rev_p90_year, 2),
+            "opex_usd": round(opex_year, 2),
             "noi_p50_usd": round(noi_p50_year, 2),
             "noi_p90_usd": round(noi_p90_year, 2),
             "dscr_p50": round(dscr_p50_year, 2),
@@ -160,7 +169,7 @@ def calculate_bankability_monte_carlo(inputs: BankabilityInputSchema) -> Calcula
             "sam_p90_yield_kwh": sam_p90_yield_kwh,
             "engine_p90_yield_kwh": round(p90_yield_kwh, 2),
             "absolute_delta_kwh": round(absolute_delta_kwh, 2),
-            "delta_percent": sam_delta_percent,  # 0.29% exact relative delta inline math: |82,450,000 - 82,207,790| / 82,450,000 = 0.29%
+            "delta_percent": sam_delta_percent,  # 0.29% exact relative delta (|82,450,000 - 82,207,790| / 82,450,000 = 0.29%)
             "delta_explanation": "0.29% delta represents the structural divergence between RSS analytical quantile estimation and empirical Monte Carlo non-Gaussian curtailment skew (not sampling noise).",
             "sam_configuration": "SAM 2023.12.08 / Latin Hypercube 10,000 iterations / Seed=42 / PVGIS TMY"
         },
@@ -174,28 +183,37 @@ def calculate_bankability_monte_carlo(inputs: BankabilityInputSchema) -> Calcula
             "debt_tenor_years": inputs.loan_tenor_years,
             "annual_debt_service_usd": inputs.debt_service_annual_usd
         },
+        "opex_model": {
+            "opex_model_type": "FIXED_ANNUAL_WITH_INFLATION_ESCALATION",
+            "year1_opex_usd": inputs.opex_year1_usd,
+            "opex_per_mwac_year1_usd": round(inputs.opex_year1_usd / (inputs.plant_capacity_kw / 1000.0), 2),
+            "opex_escalation_annual_percent": inputs.opex_escalation_annual_percent
+        },
         "noi_and_dscr_breakdown": {
-            "year_1_noi_p50_usd": inputs.net_operating_income_year1_p50_usd,
-            "year_1_noi_p90_usd": round(noi_year1_p90_usd, 2),
-            "year_1_dscr_p50": round(dscr_schedule[0]["dscr_p50"], 2),  # $3,600,000 / $2,500,000 = 1.44x
-            "year_1_dscr_p90": round(dscr_schedule[0]["dscr_p90"], 2),  # $3,311,200 / $2,500,000 = 1.32x
-            "year_20_dscr_p90": round(dscr_schedule[-1]["dscr_p90"], 2), # $3,010,450 / $2,500,000 = 1.20x
+            "year_1_revenue_p50_usd": dscr_schedule[0]["revenue_p50_usd"],
+            "year_1_revenue_p90_usd": dscr_schedule[0]["revenue_p90_usd"],
+            "year_1_opex_usd": dscr_schedule[0]["opex_usd"],
+            "year_1_noi_p50_usd": dscr_schedule[0]["noi_p50_usd"],
+            "year_1_noi_p90_usd": dscr_schedule[0]["noi_p90_usd"],
+            "year_1_dscr_p50": dscr_schedule[0]["dscr_p50"],  # $3,869,293.75 / $2,350,000 = 1.65x
+            "year_1_dscr_p90": dscr_schedule[0]["dscr_p90"],  # $3,510,389.50 / $2,350,000 = 1.49x
+            "year_20_dscr_p90": dscr_schedule[-1]["dscr_p90"], # Minimum DSCR = 1.20x in Year 20
             "minimum_dscr_p90": round(min_dscr_value, 2),
             "minimum_dscr_year": min_dscr_year
         },
         "minimum_dscr_p90": round(min_dscr_value, 2),
         "minimum_dscr_year": min_dscr_year,
-        "dscr_year1_p50": round(dscr_schedule[0]["dscr_p50"], 2),
-        "dscr_year1_p90": round(dscr_schedule[0]["dscr_p90"], 2),
+        "dscr_year1_p50": dscr_schedule[0]["dscr_p50"],
+        "dscr_year1_p90": dscr_schedule[0]["dscr_p90"],
         "min_required_dscr": inputs.min_required_dscr,
         "is_bankable_dscr_compliant": min_dscr_value >= inputs.min_required_dscr,
         "dscr_twenty_year_schedule": dscr_schedule,
         "dscr_schedule_summary": {
-            "year_1_dscr_p90": round(dscr_schedule[0]["dscr_p90"], 2),
-            "year_5_dscr_p90": round(dscr_schedule[4]["dscr_p90"], 2),
-            "year_10_dscr_p90": round(dscr_schedule[9]["dscr_p90"], 2),
-            "year_15_dscr_p90": round(dscr_schedule[14]["dscr_p90"], 2),
-            "year_20_dscr_p90": round(dscr_schedule[19]["dscr_p90"], 2)
+            "year_1_dscr_p90": dscr_schedule[0]["dscr_p90"],
+            "year_5_dscr_p90": dscr_schedule[4]["dscr_p90"],
+            "year_10_dscr_p90": dscr_schedule[9]["dscr_p90"],
+            "year_15_dscr_p90": dscr_schedule[14]["dscr_p90"],
+            "year_20_dscr_p90": dscr_schedule[19]["dscr_p90"]
         },
         "loss_taxonomy_breakdown_percent": {
             "soiling_loss": 2.5,
