@@ -1,0 +1,14 @@
+id: MENA-GCC-v1
+description: Middle East & North Africa (GCC) Utility-Scale High Voltage Grid Profile
+jurisdiction: MENA-GCC
+version: 1.0.0
+standard_references:
+  - IEC 62548
+  - IEC 60364
+  - IEC 60909
+  - IEEE 1547
+hv_voltage_levels_kv: [132, 220, 400]
+min_required_dscr: 1.15
+default_grid_frequency_hz: 50.0
+max_ambient_temperature_c: 50.0
+requires_high_temp_derating: true
