@@ -63,10 +63,11 @@ def calculate_hv_protection(inputs: HVProtectionInputSchema) -> CalculationResul
 
     # ANSI 87T: Transformer Differential Protection (IEEE C37.91 / IEC 60255-187-1)
     i_nom_primary = (inputs.transformer_mva * 1000.0) / (1.73205 * inputs.system_voltage_kv)
-    pickup_differential_a = 0.20 * (i_nom_primary / ct_ratio) * inputs.ct_secondary_ratio
+    i_nom_secondary = i_nom_primary / ct_ratio
+    pickup_differential_a = 0.20 * i_nom_secondary  # 20% pickup in secondary A
     slope_1_percent = 25.0  # Normal operation slope (25%)
     slope_2_percent = 60.0  # High fault current CT saturation slope (60%)
-    unrestrained_pickup_multiplier = 8.0  # 8x Inom instantaneous trip
+    unrestrained_pickup_a = 8.0 * i_nom_secondary  # 8x Inom instantaneous trip
 
     # ANSI 87B: Busbar Differential Protection (IEEE C37.234)
     busbar_pickup_a = 0.50 * inputs.ct_secondary_ratio  # 50% CT secondary nominal
@@ -103,7 +104,7 @@ def calculate_hv_protection(inputs: HVProtectionInputSchema) -> CalculationResul
             "pickup_differential_a": round(pickup_differential_a, 3),
             "slope_1_percent": slope_1_percent,
             "slope_2_percent": slope_2_percent,
-            "unrestrained_pickup_a": round(unrestrained_pickup_multiplier * (i_nom_primary / ct_ratio) * inputs.ct_secondary_ratio, 3),
+            "unrestrained_pickup_a": round(unrestrained_pickup_a, 3),
             "standard_citation": "IEEE C37.91 / IEC 60255-187-1"
         },
         "ansi_87b_busbar_differential": {
