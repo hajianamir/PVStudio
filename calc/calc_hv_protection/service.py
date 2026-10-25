@@ -1,9 +1,9 @@
-"""HV Substation Protection Relaying Service (IEEE C37.113 / IEC 60255).
+"""HV Substation Protection Relaying Service (IEEE C37.113 / IEEE C37.91 / IEEE C37.234 / IEC 60255).
 
 Calculates protection settings for high-voltage transmission interconnects:
-- ANSI 21: Distance Protection (Zone 1, Zone 2, Zone 3 impedance reach)
-- ANSI 87T: Transformer Differential Protection (Pickup current, Slope 1, Slope 2)
-- ANSI 87B: Busbar Differential Protection (High-impedance or low-impedance percentage pickup)
+- ANSI 21: Distance Protection (Zone 1, Zone 2, Zone 3 impedance reach) - IEEE C37.113
+- ANSI 87T: Transformer Differential Protection (Pickup current, Slope 1, Slope 2) - IEEE C37.91 & IEC 60255-187-1
+- ANSI 87B: Busbar Differential Protection (High-impedance or low-impedance percentage pickup) - IEEE C37.234
 """
 
 import datetime
@@ -15,7 +15,7 @@ MODULE_NAME = "calc_hv_protection"
 MODULE_VERSION = "1.0.0"
 
 class HVProtectionInputSchema(BaseModel):
-    system_voltage_kv: float = Field(default=110.0, description="HV nominal line-to-line voltage in kV (e.g. 110.0, 115.0, 220.0, 400.0)")
+    system_voltage_kv: float = Field(default=110.0, description="HV nominal line-to-line voltage in kV (e.g. 110.0, 115.0, 132.0, 220.0, 400.0)")
     line_length_km: float = Field(default=15.0, description="Transmission line length in km")
     line_impedance_ohm_per_km: float = Field(default=0.38, description="Positive-sequence line impedance in ohms/km")
     ct_primary_ratio: float = Field(default=1200.0, description="Primary rating of CT (e.g. 1200:5 or 1200:1)")
@@ -61,14 +61,14 @@ def calculate_hv_protection(inputs: HVProtectionInputSchema) -> CalculationResul
     z3_secondary_ohms = z3_primary_ohms * impedance_conversion_factor
     z3_time_delay_sec = 0.80  # 800 ms delay
 
-    # ANSI 87T: Transformer Differential Protection (IEC 60255)
+    # ANSI 87T: Transformer Differential Protection (IEEE C37.91 / IEC 60255-187-1)
     i_nom_primary = (inputs.transformer_mva * 1000.0) / (1.73205 * inputs.system_voltage_kv)
     pickup_differential_a = 0.20 * (i_nom_primary / ct_ratio) * inputs.ct_secondary_ratio
     slope_1_percent = 25.0  # Normal operation slope (25%)
     slope_2_percent = 60.0  # High fault current CT saturation slope (60%)
     unrestrained_pickup_multiplier = 8.0  # 8x Inom instantaneous trip
 
-    # ANSI 87B: Busbar Differential Protection
+    # ANSI 87B: Busbar Differential Protection (IEEE C37.234)
     busbar_pickup_a = 0.50 * inputs.ct_secondary_ratio  # 50% CT secondary nominal
     busbar_operation_time_ms = 15.0  # High-speed sub-cycle trip (15 ms)
 
@@ -96,14 +96,15 @@ def calculate_hv_protection(inputs: HVProtectionInputSchema) -> CalculationResul
                 "reach_secondary_ohms": round(z3_secondary_ohms, 3),
                 "time_delay_sec": z3_time_delay_sec,
                 "reach_percent_line": 150.0
-            }
+            },
+            "standard_citation": "IEEE C37.113"
         },
         "ansi_87t_transformer_differential": {
             "pickup_differential_a": round(pickup_differential_a, 3),
             "slope_1_percent": slope_1_percent,
             "slope_2_percent": slope_2_percent,
             "unrestrained_pickup_a": round(unrestrained_pickup_multiplier * (i_nom_primary / ct_ratio) * inputs.ct_secondary_ratio, 3),
-            "standard_citation": "IEC 60255-187-1"
+            "standard_citation": "IEEE C37.91 / IEC 60255-187-1"
         },
         "ansi_87b_busbar_differential": {
             "pickup_current_a": round(busbar_pickup_a, 3),
