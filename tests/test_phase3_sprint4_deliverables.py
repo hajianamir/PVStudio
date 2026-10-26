@@ -89,3 +89,32 @@ def test_ansi_21_dynamic_computation_scaling():
     # 30 km line impedance must be exactly 2x 15 km line impedance
     assert res_30.outputs["z_line_primary_ohms"] == 2 * res_15.outputs["z_line_primary_ohms"]
     assert res_30.outputs["ansi_21_distance"]["zone_1"]["reach_primary_ohms"] == 2 * res_15.outputs["ansi_21_distance"]["zone_1"]["reach_primary_ohms"]
+
+def test_ansi_87t_and_87b_dynamic_computation_scaling():
+    # 87T Scaling Test: 55 MVA vs 110 MVA Transformer
+    inputs_55mva = HVProtectionInputSchema(transformer_mva=55.0)
+    inputs_110mva = HVProtectionInputSchema(transformer_mva=110.0)
+
+    res_55 = calculate_hv_protection(inputs_55mva)
+    res_110 = calculate_hv_protection(inputs_110mva)
+
+    pickup_55 = res_55.outputs["ansi_87t_transformer_differential"]["pickup_differential_a"]
+    pickup_110 = res_110.outputs["ansi_87t_transformer_differential"]["pickup_differential_a"]
+
+    # 110 MVA transformer secondary current doubles, pickup doubles
+    assert abs(pickup_110 - 2 * pickup_55) <= 0.005
+
+    # 87B Scaling Test: 5A vs 1A CT Secondary Rating
+    inputs_ct5a = HVProtectionInputSchema(ct_secondary_ratio=5.0)
+    inputs_ct1a = HVProtectionInputSchema(ct_secondary_ratio=1.0)
+
+    res_5a = calculate_hv_protection(inputs_ct5a)
+    res_1a = calculate_hv_protection(inputs_ct1a)
+
+    pickup_5a = res_5a.outputs["ansi_87b_busbar_differential"]["pickup_current_a"]
+    pickup_1a = res_1a.outputs["ansi_87b_busbar_differential"]["pickup_current_a"]
+
+    # 5A secondary yields 2.5A pickup; 1A secondary yields 0.5A pickup (exactly 5:1 ratio)
+    assert pickup_5a == 2.50
+    assert pickup_1a == 0.50
+    assert pickup_5a == 5 * pickup_1a
