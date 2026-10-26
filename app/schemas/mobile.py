@@ -1,8 +1,20 @@
-"""Schemas for Android Offline-First Mobile Field Operations & Sync Service."""
+"""Schemas for Android Offline-First Mobile Field Operations, Auditable Conflict Logging & Sync Service."""
 
 import datetime
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
+
+class ConflictLogEntry(BaseModel):
+    conflict_id: str = Field(..., description="Unique conflict log UUID")
+    record_id: str = Field(..., description="Target record ID where conflict occurred")
+    field_name: str = Field(..., description="Specific field name in conflict")
+    existing_value: Any = Field(..., description="Existing server value")
+    incoming_value: Any = Field(..., description="Incoming client value")
+    existing_updated_by: str
+    existing_updated_at: str
+    incoming_updated_by: str
+    incoming_updated_at: str
+    resolution_status: str = "AUDITED_OVERWRITE"  # AUDITED_OVERWRITE, MERGED, MANUAL_PENDING
 
 class FieldInspectionRecord(BaseModel):
     record_id: str = Field(..., description="Unique client UUID generated on Android")
@@ -14,6 +26,10 @@ class FieldInspectionRecord(BaseModel):
     insulation_resistance_mohm: float = Field(default=500.0, description="Measured insulation resistance in M-ohms")
     scanned_barcodes: List[str] = Field(default_factory=list, description="Scanned panel/inverter serial numbers")
     annotated_photo_urls: List[str] = Field(default_factory=list, description="URLs or local paths of annotated site photos")
+    field_metadata: Dict[str, Dict[str, str]] = Field(
+        default_factory=dict,
+        description="Per-field audit metadata tracking {field_name: {updated_by, updated_at}}"
+    )
 
 class SyncBatchRequest(BaseModel):
     device_id: str = Field(..., description="Android device ID")
@@ -22,7 +38,7 @@ class SyncBatchRequest(BaseModel):
 
 class SyncBatchResponse(BaseModel):
     sync_sequence_id: str
-    status: str = "SUCCESS"  # SUCCESS, CONFLICT_RESOLVED, ERROR
+    status: str = "SUCCESS"  # SUCCESS, CONFLICT_AUDITED, ERROR
     processed_count: int
-    rejected_records: List[str] = Field(default_factory=list)
+    conflict_log_entries: List[ConflictLogEntry] = Field(default_factory=list)
     server_timestamp_utc: str

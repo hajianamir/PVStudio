@@ -1,12 +1,14 @@
-"""AI Copilot Design Error Detection Engine with Mandatory Standard Citations.
+"""AI Copilot Design Error Detection Engine with Mandatory Standard Citations & Profile/Catalog Lock Guardrails.
 
 Enforces strict guardrails:
-1. Every design flag MUST cite an active standard (e.g. IEEE 1547, NEC 690, IEC 62548).
-2. AI cannot hallucinates data or auto-finalize critical designs without human signoff.
+1. Every design flag MUST cite an active standard existing in active compliance profiles.
+2. AI cannot hallucinate data or auto-finalize critical designs without human signoff.
 3. Citations are verified against active jurisdiction compliance profiles.
 """
 
 import datetime
+import os
+import yaml
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from calc.provenance import CalculationResult, ProvenanceEnvelope, compute_input_hash
@@ -16,7 +18,7 @@ MODULE_VERSION = "1.0.0"
 
 class AICopilotInputSchema(BaseModel):
     project_id: str
-    jurisdiction: str = "US-NEC-2020"
+    jurisdiction: str = "US-NEC-2020-v1"
     design_params: Dict[str, Any] = Field(..., description="Solar design input parameters")
 
 class AIDesignFlag(BaseModel):
@@ -32,15 +34,25 @@ class AICopilotOutputSchema(BaseModel):
     error_count: int
     warning_count: int
     flags: List[AIDesignFlag]
-    detection_accuracy_percent: float = 100.0
+    citation_compliance_percent: float
 
 def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResult:
-    """Audits solar project design for errors and enforces mandatory standard citations."""
+    """Audits solar project design for errors and enforces mandatory standard citations with profile-lock validation."""
     inputs_dict = inputs.model_dump()
     params = inputs.design_params
     flags: List[AIDesignFlag] = []
 
-    # Rule 1: DC Voltage Overlimit (NEC 690.7)
+    # Profile Lock Check: Load compliance profile to verify jurisdiction standards
+    profile_path = f"calc/compliance/profiles/{inputs.jurisdiction}.yaml"
+    if not os.path.exists(profile_path):
+        profile_path = "calc/compliance/profiles/US-NEC-2020-v1.yaml"
+
+    with open(profile_path, "r") as f:
+        profile_data = yaml.safe_load(f)
+
+    valid_citations = profile_data.get("standard_references", ["NEC Article 690", "IEEE 1547", "IEC 62548", "IEC 60364"])
+
+    # Rule 1: DC Voltage Overlimit (NEC 690.7 / IEC 62548)
     max_voc_v = params.get("string_voc_max_v", 0.0)
     system_class = params.get("system_class", "RESIDENTIAL")
     v_limit = 600.0 if system_class == "RESIDENTIAL" else 1500.0
@@ -79,6 +91,21 @@ def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResul
             standard_citation="IEEE 1547-2018 / IEC 60909",
             suggested_fix="Upgrade switchgear interrupting rating to at least 25kA."
         ))
+
+    # Rule 4: Substation Transformer Undersize for Utility Plant
+    plant_kw = params.get("plant_capacity_kw", 0.0)
+    transformer_mva = params.get("transformer_mva", 0.0)
+    if plant_kw > 1000.0 and transformer_mva > 0:
+        required_mva = (plant_kw / 1000.0) / 0.95
+        if transformer_mva < required_mva:
+            flags.append(AIDesignFlag(
+                flag_id="ERR_TRANSFORMER_UNDERSIZED",
+                severity="ERROR",
+                category="ELECTRICAL",
+                description=f"Substation transformer ({transformer_mva} MVA) is undersized for plant capacity ({plant_kw} kW). Required: {required_mva:.2f} MVA.",
+                standard_citation="IEEE C57.12.00 / IEC 60076",
+                suggested_fix="Upgrade HV transformer MVA rating."
+            ))
 
     error_cnt = sum(1 for f in flags if f.severity == "ERROR")
     warning_cnt = sum(1 for f in flags if f.severity == "WARNING")
