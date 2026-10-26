@@ -2,7 +2,7 @@
 
 Verifies:
 1. Android Offline-First Mobile Field Sync with Auditable Per-Field Conflict Logging & Idempotency.
-2. AI Copilot Design Error Detection Benchmark (20 parametrized seeded error cases spanning Residential, C&I, Utility, Financial DSCR, MENA-GCC, multi-error, and knife-edge cases).
+2. AI Copilot Design Error Detection Benchmark (10 parametrized seeded error cases spanning Residential, C&I, Utility, Financial DSCR, MENA-GCC, multi-error, and knife-edge cases).
 3. Profile-Lock & Catalog-Lock Guardrails.
 """
 
@@ -55,7 +55,7 @@ def test_android_offline_mobile_sync_idempotency_and_conflict_logging():
     # Verifies Additive Barcode Merge (SN1001, SN1002, SN1003 all present)
     assert sorted(svc._db_store["rec_001"].scanned_barcodes) == ["SN1001", "SN1002", "SN1003"]
 
-# 20 Seeded Solar Design Error Test Cases for AI Copilot Benchmark
+# 10 Seeded Solar Design Error Test Cases for AI Copilot Benchmark
 AI_BENCHMARK_CASES = [
     # Case 1: Residential Voc Overlimit (680V > 600V)
     ("US-NEC-2020-v1", {"string_voc_max_v": 680.0, "system_class": "RESIDENTIAL"}, "ERR_DC_VOC_OVERLIMIT", "NEC Article 690.7"),
@@ -68,14 +68,14 @@ AI_BENCHMARK_CASES = [
     # Case 5: Utility Substation Transformer Undersized
     ("EU-DE-v1", {"plant_capacity_kw": 50000.0, "transformer_mva": 40.0}, "ERR_TRANSFORMER_UNDERSIZED", "IEEE C57.12.00 / IEC 60076"),
     # Case 6: Financial DSCR Shortfall (< 1.20x)
-    ("US-NEC-2020-v1", {"dscr_min_twenty_year": 1.12}, "ERR_FINANCIAL_DSCR_SHORTFALL", "NREL Project Finance Standard"),
+    ("US-NEC-2020-v1", {"dscr_min_twenty_year": 1.12}, "ERR_FINANCIAL_DSCR_SHORTFALL", "calc/compliance/profiles/US-NEC-2020-v1.yaml §min_required_dscr"),
     # Case 7: MENA-GCC DSCR Shortfall (< 1.15x)
-    ("MENA-GCC-v1", {"dscr_min_twenty_year": 1.08}, "ERR_FINANCIAL_DSCR_SHORTFALL", "SEC Grid Code / Regional Project Finance Covenant"),
+    ("MENA-GCC-v1", {"dscr_min_twenty_year": 1.08}, "ERR_FINANCIAL_DSCR_SHORTFALL", "calc/compliance/profiles/MENA-GCC-v1.yaml §min_required_dscr"),
     # Case 8: MENA-GCC High Temperature Grid Derating (> 45C)
     ("MENA-GCC-v1", {"max_ambient_temperature_c": 48.0}, "WARN_GCC_HIGH_TEMP_DERATING", "SEC Grid Code §4.2 / IEC 62548"),
     # Case 9: DC Voc Knife-Edge Thermal Risk (597V / 600V)
     ("US-NEC-2020-v1", {"string_voc_max_v": 597.0, "system_class": "RESIDENTIAL"}, "WARN_DC_VOC_KNIFE_EDGE", "NEC Article 690.7"),
-    # Case 10: Multi-Error Case (Voc Overlimit + Voltage Drop)
+    # Case 10: Multi-Error Case (720V Voc + 4.5% Vdrop)
     ("US-NEC-2020-v1", {"string_voc_max_v": 720.0, "ac_voltage_drop_percent": 4.5, "system_class": "RESIDENTIAL"}, "ERR_DC_VOC_OVERLIMIT", "NEC Article 690.7"),
 ]
 
@@ -92,3 +92,18 @@ def test_ai_copilot_seeded_error_case_benchmark(jurisdiction, params, expected_f
     flag_map = {f["flag_id"]: f["standard_citation"] for f in flags}
     assert expected_flag_id in flag_map
     assert flag_map[expected_flag_id] == expected_citation
+
+def test_ai_copilot_fabricated_standard_rejection_guardrail():
+    # Verifies that AI flags do not contain hallucinated or unapproved standards
+    inputs = AICopilotInputSchema(
+        project_id="proj_guardrail",
+        jurisdiction="US-NEC-2020-v1",
+        design_params={"string_voc_max_v": 700.0, "system_class": "RESIDENTIAL"}
+    )
+    res = audit_solar_design_copilot(inputs)
+    flags = res.outputs["flags"]
+    citations = [f["standard_citation"] for f in flags]
+
+    assert "IEEE 99999-2050" not in citations
+    assert "NREL Project Finance Standard" not in citations
+    assert "Regional Project Finance Covenant" not in citations

@@ -124,7 +124,7 @@ def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResul
             severity="ERROR",
             category="BANKABILITY",
             description=f"Minimum 20-year DSCR ({dscr_min:.2f}x) falls below required covenant limit ({min_required_dscr:.2f}x).",
-            standard_citation="SEC Grid Code / Regional Project Finance Covenant" if "MENA" in inputs.jurisdiction else "NREL Project Finance Standard",
+            standard_citation=f"calc/compliance/profiles/{inputs.jurisdiction}.yaml §min_required_dscr",
             suggested_fix="Reduce debt sizing or re-negotiate PPA contract tariff."
         ))
 
