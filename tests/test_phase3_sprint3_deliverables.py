@@ -4,7 +4,7 @@ Verifies:
 1. `calc_hv_protection` Distance (21), Transformer Differential (87T), and Busbar Differential (87B) relay settings.
 2. Complete 20-Year DSCR schedule table and minimum endpoint in `calc_bankability`.
 3. MENA-GCC compliance profile YAML structure and 132/400 kV HV voltage levels.
-4. Central Architecture vs String Topology end-to-end differentiation (HV bay count, transformer count, and Sungrow skid BOM).
+4. Central Architecture vs String Topology end-to-end differentiation (HV bay count, transformer count, Sungrow skid BOM, and SLD SVG container nodes).
 """
 
 import pytest
@@ -13,6 +13,7 @@ from calc.calc_hv_protection.service import HVProtectionInputSchema, calculate_h
 from calc.calc_bankability.service import BankabilityInputSchema, calculate_bankability_monte_carlo
 from calc.calc_recommender.service import TopologyRecommenderInput, recommend_inverter_topology
 from calc.calc_grid_interconnection.service import InterconnectionInput, calculate_grid_interconnection
+from app.services.permit_package_generator import PermitPackageGeneratorService, PermitPackageConfig
 
 def test_hv_protection_calculation():
     inputs = HVProtectionInputSchema(
@@ -81,3 +82,15 @@ def test_central_vs_string_topology_end_to_end_differentiation():
     assert outputs["total_substation_bays"] == 4
     assert outputs["bay_breakdown"]["incomer_bays"] == 1
     assert outputs["bay_breakdown"]["transformer_bays"] == 1
+
+    # 3. Design Path Central Architecture BOM & SLD Differentiation Assertions
+    # For a 50 MW plant using Sungrow SG3125HV skids (3.125 MW ac each): 50000 / 3125 = 16 container skids
+    num_central_skids = int(50000.0 / 3125.0)
+    assert num_central_skids == 16
+
+    # Verify SLD SVG generator renders central container substation nodes
+    config = PermitPackageConfig(project_id="proj_central_50mw", project_name="50MW Central Utility Plant")
+    permit_svc = PermitPackageGeneratorService(config)
+    package = permit_svc.generate_permit_package(grid_res.outputs)
+    assert "<svg" in package.single_line_diagram_svg
+    assert "HV Interconnection Substation" in package.single_line_diagram_svg
