@@ -24,7 +24,7 @@ class AICopilotInputSchema(BaseModel):
 class AIDesignFlag(BaseModel):
     flag_id: str
     severity: str  # ERROR, WARNING, OPTIMIZATION
-    category: str  # ELECTRICAL, VOLTAGE_DROP, PROTECTION, STRUCTURAL
+    category: str  # ELECTRICAL, VOLTAGE_DROP, PROTECTION, STRUCTURAL, BANKABILITY
     description: str
     standard_citation: str = Field(..., description="Mandatory reference standard citation")
     suggested_fix: str
@@ -37,7 +37,7 @@ class AICopilotOutputSchema(BaseModel):
     citation_compliance_percent: float
 
 def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResult:
-    """Audits solar project design for errors and enforces mandatory standard citations with profile-lock validation."""
+    """Audits solar project design for errors across all domains and enforces mandatory standard citations with profile-lock validation."""
     inputs_dict = inputs.model_dump()
     params = inputs.design_params
     flags: List[AIDesignFlag] = []
@@ -50,7 +50,7 @@ def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResul
     with open(profile_path, "r") as f:
         profile_data = yaml.safe_load(f)
 
-    valid_citations = profile_data.get("standard_references", ["NEC Article 690", "IEEE 1547", "IEC 62548", "IEC 60364"])
+    min_required_dscr = profile_data.get("min_required_dscr", 1.20)
 
     # Rule 1: DC Voltage Overlimit (NEC 690.7 / IEC 62548)
     max_voc_v = params.get("string_voc_max_v", 0.0)
@@ -65,6 +65,15 @@ def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResul
             description=f"Max string Voc ({max_voc_v}V) exceeds maximum permitted system voltage ({v_limit}V).",
             standard_citation="NEC Article 690.7" if "US" in inputs.jurisdiction else "IEC 62548 §6.2",
             suggested_fix="Reduce modules per string or select higher voltage class equipment."
+        ))
+    elif max_voc_v >= 0.99 * v_limit:
+        flags.append(AIDesignFlag(
+            flag_id="WARN_DC_VOC_KNIFE_EDGE",
+            severity="WARNING",
+            category="ELECTRICAL",
+            description=f"Max string Voc ({max_voc_v}V) is within 1% of system voltage limit ({v_limit}V). High thermal risk.",
+            standard_citation="NEC Article 690.7",
+            suggested_fix="Consider reducing 1 module per string to allow thermal margin."
         ))
 
     # Rule 2: Voltage Drop Excess (NEC 210.19 / IEC 60364)
@@ -106,6 +115,30 @@ def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResul
                 standard_citation="IEEE C57.12.00 / IEC 60076",
                 suggested_fix="Upgrade HV transformer MVA rating."
             ))
+
+    # Rule 5: Financial Bankability DSCR Shortfall (< min_required_dscr)
+    dscr_min = params.get("dscr_min_twenty_year", 0.0)
+    if 0.0 < dscr_min < min_required_dscr:
+        flags.append(AIDesignFlag(
+            flag_id="ERR_FINANCIAL_DSCR_SHORTFALL",
+            severity="ERROR",
+            category="BANKABILITY",
+            description=f"Minimum 20-year DSCR ({dscr_min:.2f}x) falls below required covenant limit ({min_required_dscr:.2f}x).",
+            standard_citation="SEC Grid Code / Regional Project Finance Covenant" if "MENA" in inputs.jurisdiction else "NREL Project Finance Standard",
+            suggested_fix="Reduce debt sizing or re-negotiate PPA contract tariff."
+        ))
+
+    # Rule 6: MENA-GCC High Temperature Grid Derating (VDE/SEC Grid Code)
+    ambient_temp_c = params.get("max_ambient_temperature_c", 0.0)
+    if inputs.jurisdiction == "MENA-GCC-v1" and ambient_temp_c > 45.0:
+        flags.append(AIDesignFlag(
+            flag_id="WARN_GCC_HIGH_TEMP_DERATING",
+            severity="WARNING",
+            category="ELECTRICAL",
+            description=f"Max ambient temperature ({ambient_temp_c}°C) requires high-temperature inverter derating check.",
+            standard_citation="SEC Grid Code §4.2 / IEC 62548",
+            suggested_fix="Enable high-ambient temperature derating in inverter sizing calculation."
+        ))
 
     error_cnt = sum(1 for f in flags if f.severity == "ERROR")
     warning_cnt = sum(1 for f in flags if f.severity == "WARNING")
