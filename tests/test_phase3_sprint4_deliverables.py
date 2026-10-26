@@ -77,3 +77,15 @@ def test_ansi_87b_busbar_differential_ieee_c37_234_reference():
     assert abs(diff_87b["pickup_current_a"] - 2.50) <= 0.01
     assert diff_87b["operation_time_ms"] == 15.0
     assert diff_87b["standard_citation"] == "IEEE C37.234"
+
+def test_ansi_21_dynamic_computation_scaling():
+    # Verify line length scaling (30 km vs 15 km line)
+    inputs_15km = HVProtectionInputSchema(line_length_km=15.0)
+    inputs_30km = HVProtectionInputSchema(line_length_km=30.0)
+
+    res_15 = calculate_hv_protection(inputs_15km)
+    res_30 = calculate_hv_protection(inputs_30km)
+
+    # 30 km line impedance must be exactly 2x 15 km line impedance
+    assert res_30.outputs["z_line_primary_ohms"] == 2 * res_15.outputs["z_line_primary_ohms"]
+    assert res_30.outputs["ansi_21_distance"]["zone_1"]["reach_primary_ohms"] == 2 * res_15.outputs["ansi_21_distance"]["zone_1"]["reach_primary_ohms"]
