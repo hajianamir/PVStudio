@@ -63,7 +63,7 @@ def validate_citation(citation_str: str) -> bool:
         "NEC Article 210.19(A) Informational Note No. 2",
         "IEEE 1547-2018 / IEC 60909",
         "IEEE C57.12.00 / IEC 60076",
-        "IEEE C37.91 / IEC 60255-187-1",
+        "IEEE C57.131 / IEEE C57.12.00",
         "SEC Grid Code §4.2 / IEC 62548",
         "IEC 62548 §6.2",
         "IEC 60364-5-52"
@@ -174,7 +174,7 @@ def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResul
             suggested_fix="Enable high-ambient temperature derating in inverter sizing calculation."
         ))
 
-    # Rule 7: Transformer Tap Setting Mismatch Check (IEEE C37.91)
+    # Rule 7: Transformer Tap Setting Mismatch Check (IEEE C57.131 / IEEE C57.12.00 - Tap Changer Regulation)
     transformer_tap_percent = params.get("transformer_tap_percent", 0.0)
     grid_nominal_kv = params.get("grid_nominal_kv", 110.0)
     actual_grid_kv = params.get("actual_grid_kv", 110.0)
@@ -186,7 +186,7 @@ def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResul
                 severity="WARNING",
                 category="ELECTRICAL",
                 description=f"Grid voltage deviation ({voltage_dev_percent:.1f}%) requires transformer tap changer adjustment.",
-                standard_citation="IEEE C37.91 / IEC 60255-187-1",
+                standard_citation="IEEE C57.131 / IEEE C57.12.00",
                 suggested_fix="Adjust DETC/OLTC transformer tap setting to match grid voltage level."
             ))
 
