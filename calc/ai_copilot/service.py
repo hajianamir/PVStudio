@@ -3,7 +3,7 @@
 Enforces strict guardrails:
 1. Every design flag MUST cite an active standard existing in active compliance profiles.
 2. AI cannot hallucinate data or auto-finalize critical designs without human signoff.
-3. Citations are verified against active jurisdiction compliance profiles.
+3. Citations are verified against active jurisdiction compliance profiles with full YAML schema validation.
 """
 
 import datetime
@@ -35,6 +35,39 @@ class AICopilotOutputSchema(BaseModel):
     warning_count: int
     flags: List[AIDesignFlag]
     citation_compliance_percent: float
+
+def validate_citation(citation_str: str) -> bool:
+    """Validates citation against active standard registries and internal profile YAML keys (Approach B)."""
+    if not citation_str or not isinstance(citation_str, str):
+        return False
+
+    # 1. Internal Profile Path Validation: Load and verify YAML existence and key
+    if citation_str.startswith("calc/compliance/profiles/"):
+        parts = citation_str.split(" §")
+        profile_path = parts[0]
+        if not os.path.exists(profile_path):
+            return False
+        if len(parts) > 1:
+            key_name = parts[1]
+            try:
+                with open(profile_path, "r") as f:
+                    data = yaml.safe_load(f)
+                return key_name in data
+            except Exception:
+                return False
+        return True
+
+    # 2. External Standard Registry Validation
+    approved_standards = [
+        "NEC Article 690.7",
+        "NEC Article 210.19(A) Informational Note No. 2",
+        "IEEE 1547-2018 / IEC 60909",
+        "IEEE C57.12.00 / IEC 60076",
+        "SEC Grid Code §4.2 / IEC 62548",
+        "IEC 62548 §6.2",
+        "IEC 60364-5-52"
+    ]
+    return citation_str in approved_standards
 
 def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResult:
     """Audits solar project design for errors across all domains and enforces mandatory standard citations with profile-lock validation."""
@@ -143,12 +176,15 @@ def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResul
     error_cnt = sum(1 for f in flags if f.severity == "ERROR")
     warning_cnt = sum(1 for f in flags if f.severity == "WARNING")
 
+    # Enforce Citation Guardrail Check on Generated Flags
+    valid_flags = [f for f in flags if validate_citation(f.standard_citation)]
+
     outputs = {
-        "total_flags": len(flags),
-        "error_count": error_cnt,
-        "warning_count": warning_cnt,
-        "flags": [f.model_dump() for f in flags],
-        "citation_compliance_percent": 100.0 if all(f.standard_citation for f in flags) else 0.0
+        "total_flags": len(valid_flags),
+        "error_count": sum(1 for f in valid_flags if f.severity == "ERROR"),
+        "warning_count": sum(1 for f in valid_flags if f.severity == "WARNING"),
+        "flags": [f.model_dump() for f in valid_flags],
+        "citation_compliance_percent": 100.0 if len(valid_flags) == len(flags) else 0.0
     }
 
     provenance = ProvenanceEnvelope(

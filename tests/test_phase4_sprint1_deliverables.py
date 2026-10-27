@@ -2,14 +2,14 @@
 
 Verifies:
 1. Android Offline-First Mobile Field Sync with Auditable Per-Field Conflict Logging & Idempotency.
-2. AI Copilot Design Error Detection Benchmark (10 parametrized seeded error cases spanning Residential, C&I, Utility, Financial DSCR, MENA-GCC, multi-error, and knife-edge cases).
-3. Profile-Lock & Catalog-Lock Guardrails.
+2. AI Copilot Design Error Detection Benchmark (10 parametrized seeded error cases).
+3. Profile-Lock & Catalog-Lock Guardrails via direct validator function testing (Approach B).
 """
 
 import pytest
 from app.schemas.mobile import SyncBatchRequest, FieldInspectionRecord
 from app.services.mobile_sync.service import MobileSyncService
-from calc.ai_copilot.service import AICopilotInputSchema, audit_solar_design_copilot
+from calc.ai_copilot.service import AICopilotInputSchema, audit_solar_design_copilot, validate_citation
 
 def test_android_offline_mobile_sync_idempotency_and_conflict_logging():
     svc = MobileSyncService()
@@ -93,17 +93,14 @@ def test_ai_copilot_seeded_error_case_benchmark(jurisdiction, params, expected_f
     assert expected_flag_id in flag_map
     assert flag_map[expected_flag_id] == expected_citation
 
-def test_ai_copilot_fabricated_standard_rejection_guardrail():
-    # Verifies that AI flags do not contain hallucinated or unapproved standards
-    inputs = AICopilotInputSchema(
-        project_id="proj_guardrail",
-        jurisdiction="US-NEC-2020-v1",
-        design_params={"string_voc_max_v": 700.0, "system_class": "RESIDENTIAL"}
-    )
-    res = audit_solar_design_copilot(inputs)
-    flags = res.outputs["flags"]
-    citations = [f["standard_citation"] for f in flags]
+def test_citation_validator_deep_rejection_guardrail():
+    # Direct Approach B Unit Test: Verifies validate_citation logic
+    assert validate_citation("IEEE 99999-2050") == False
+    assert validate_citation("NREL Project Finance Standard") == False
+    assert validate_citation("Regional Project Finance Covenant") == False
 
-    assert "IEEE 99999-2050" not in citations
-    assert "NREL Project Finance Standard" not in citations
-    assert "Regional Project Finance Covenant" not in citations
+    # Deep YAML file lookup verification
+    assert validate_citation("calc/compliance/profiles/US-NEC-2020-v1.yaml §min_required_dscr") == True
+    assert validate_citation("calc/compliance/profiles/MENA-GCC-v1.yaml §min_required_dscr") == True
+    assert validate_citation("calc/compliance/profiles/US-NEC-2020-v1.yaml §nonexistent_key") == False
+    assert validate_citation("calc/compliance/profiles/NON_EXISTENT_FILE.yaml §min_required_dscr") == False
