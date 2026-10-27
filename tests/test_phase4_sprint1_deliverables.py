@@ -104,3 +104,15 @@ def test_citation_validator_deep_rejection_guardrail():
     assert validate_citation("calc/compliance/profiles/MENA-GCC-v1.yaml §min_required_dscr") == True
     assert validate_citation("calc/compliance/profiles/US-NEC-2020-v1.yaml §nonexistent_key") == False
     assert validate_citation("calc/compliance/profiles/NON_EXISTENT_FILE.yaml §min_required_dscr") == False
+
+def test_ai_copilot_transformer_tap_mismatch_warning():
+    inputs = AICopilotInputSchema(
+        project_id="proj_tap_test",
+        jurisdiction="US-NEC-2020-v1",
+        design_params={"grid_nominal_kv": 110.0, "actual_grid_kv": 115.0, "transformer_tap_percent": 0.0}
+    )
+    res = audit_solar_design_copilot(inputs)
+    flags = res.outputs["flags"]
+    flag_ids = [f["flag_id"] for f in flags]
+
+    assert "WARN_TRANSFORMER_TAP_MISMATCH" in flag_ids

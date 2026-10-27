@@ -4,9 +4,12 @@ Verifies:
 1. User-Facing Conflict Resolution UI Handler (`resolve_user_conflict`).
 2. Dual-Measurement Preservation Model for IV Curve and Insulation Resistance (Zero Data Overwrite).
 3. Deep YAML Profile Key Validation in `validate_citation`.
+4. OpenAPI 3.1 Router Integration and Endpoint Group Validation.
 """
 
+import os
 import pytest
+from app.main import app
 from app.schemas.mobile import SyncBatchRequest, FieldInspectionRecord, ConflictResolutionRequest
 from app.services.mobile_sync.service import MobileSyncService
 from calc.ai_copilot.service import validate_citation
@@ -73,3 +76,16 @@ def test_validate_citation_deep_yaml_key_lookup():
     assert validate_citation("calc/compliance/profiles/US-NEC-2020-v1.yaml §min_required_dscr") == True
     assert validate_citation("calc/compliance/profiles/MENA-GCC-v1.yaml §min_required_dscr") == True
     assert validate_citation("calc/compliance/profiles/US-NEC-2020-v1.yaml §nonexistent_key") == False
+
+def test_openapi_schema_endpoint_groups_inclusion():
+    openapi_spec = app.openapi()
+    routes = [r.path for r in app.routes]
+
+    # Verifies OpenAPI 3.1 spec includes mobile field endpoint group
+    assert "/mobile/sync" in routes
+    assert "/mobile/resolve-conflict" in routes
+    assert "openapi" in openapi_spec
+    assert openapi_spec["openapi"].startswith("3.")
+
+def test_mobile_conflict_resolution_dialog_frontend_component_exists():
+    assert os.path.exists("app/ui/MobileConflictResolutionDialog.tsx")

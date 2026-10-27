@@ -63,6 +63,7 @@ def validate_citation(citation_str: str) -> bool:
         "NEC Article 210.19(A) Informational Note No. 2",
         "IEEE 1547-2018 / IEC 60909",
         "IEEE C57.12.00 / IEC 60076",
+        "IEEE C37.91 / IEC 60255-187-1",
         "SEC Grid Code §4.2 / IEC 62548",
         "IEC 62548 §6.2",
         "IEC 60364-5-52"
@@ -172,6 +173,22 @@ def audit_solar_design_copilot(inputs: AICopilotInputSchema) -> CalculationResul
             standard_citation="SEC Grid Code §4.2 / IEC 62548",
             suggested_fix="Enable high-ambient temperature derating in inverter sizing calculation."
         ))
+
+    # Rule 7: Transformer Tap Setting Mismatch Check (IEEE C37.91)
+    transformer_tap_percent = params.get("transformer_tap_percent", 0.0)
+    grid_nominal_kv = params.get("grid_nominal_kv", 110.0)
+    actual_grid_kv = params.get("actual_grid_kv", 110.0)
+    if actual_grid_kv > 0 and grid_nominal_kv > 0:
+        voltage_dev_percent = abs(actual_grid_kv - grid_nominal_kv) / grid_nominal_kv * 100.0
+        if voltage_dev_percent > 2.5 and abs(transformer_tap_percent) < 1.0:
+            flags.append(AIDesignFlag(
+                flag_id="WARN_TRANSFORMER_TAP_MISMATCH",
+                severity="WARNING",
+                category="ELECTRICAL",
+                description=f"Grid voltage deviation ({voltage_dev_percent:.1f}%) requires transformer tap changer adjustment.",
+                standard_citation="IEEE C37.91 / IEC 60255-187-1",
+                suggested_fix="Adjust DETC/OLTC transformer tap setting to match grid voltage level."
+            ))
 
     error_cnt = sum(1 for f in flags if f.severity == "ERROR")
     warning_cnt = sum(1 for f in flags if f.severity == "WARNING")
